@@ -106,18 +106,7 @@ class DataCollatorForMultipleChoice:
         batch["labels"] = torch.tensor(labels, dtype=torch.int64)
         return batch
 
-MyModule = lambda model_args, config: AutoModelForMultipleChoice.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config,
-            cache_dir=model_args.cache_dir,
-            revision=model_args.model_revision,
-            use_auth_token=True if model_args.use_auth_token else None,
-        )
-# class MyModule(nn.Module):
-#     def __init__(self, model_args, config):
-#         super(MyModule, self).__init__()
-#         self.model = AutoModelForMultipleChoice.from_pretrained(
+# MyModule = lambda model_args, config: AutoModelForMultipleChoice.from_pretrained(
 #             model_args.model_name_or_path,
 #             from_tf=bool(".ckpt" in model_args.model_name_or_path),
 #             config=config,
@@ -125,7 +114,23 @@ MyModule = lambda model_args, config: AutoModelForMultipleChoice.from_pretrained
 #             revision=model_args.model_revision,
 #             use_auth_token=True if model_args.use_auth_token else None,
 #         )
+class MyModule(nn.Module):
+    def __init__(self, model_args, config):
+        super(MyModule, self).__init__()
+        self.model = AutoModelForMultipleChoice.from_pretrained(
+            model_args.model_name_or_path,
+            from_tf=bool(".ckpt" in model_args.model_name_or_path),
+            config=config,
+            cache_dir=model_args.cache_dir,
+            revision=model_args.model_revision,
+            use_auth_token=True if model_args.use_auth_token else None,
+        )
 
-#     def forward(self, choices, attention_mask, answer, token_type_ids, labels, translation, input_ids):
-#         return self.model(choices=choices, attention_mask=attention_mask, answer=answer, token_type_ids=token_type_ids, labels=labels, translation=translation, input_ids=input_ids)
+    def forward(self, input_ids = None, attention_mask = None, token_type_ids = None, labels = None):
+        return self.model(
+            input_ids = input_ids, 
+            attention_mask = attention_mask, 
+            token_type_ids = token_type_ids, 
+            labels = labels, 
+        )
     
