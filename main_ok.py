@@ -46,7 +46,7 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 
-from model import unwrapped_preprocess_function, MyModule
+
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +147,7 @@ class DataTrainingArguments:
             extension = self.validation_file.split(".")[-1]
             assert extension in ["csv", "jsonl"], "`validation_file` should be a csv or a json file."
 
+
 @dataclass
 class DataCollatorForMultipleChoice:
     """
@@ -200,6 +201,7 @@ class DataCollatorForMultipleChoice:
         # Add back labels
         batch["labels"] = torch.tensor(labels, dtype=torch.int64)
         return batch
+
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -291,18 +293,19 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model = MyModule(model_args, config)
-    # model = AutoModelForMultipleChoice.from_pretrained(
-    #     model_args.model_name_or_path,
-    #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
-    #     config=config,
-    #     cache_dir=model_args.cache_dir,
-    #     revision=model_args.model_revision,
-    #     use_auth_token=True if model_args.use_auth_token else None,
-    # )
+    model = AutoModelForMultipleChoice.from_pretrained(
+        model_args.model_name_or_path,
+        from_tf=bool(".ckpt" in model_args.model_name_or_path),
+        config=config,
+        cache_dir=model_args.cache_dir,
+        revision=model_args.model_revision,
+        use_auth_token=True if model_args.use_auth_token else None,
+    )
 
     # When using your own dataset or a different dataset from swag, you will probably need to change this.
     ending_names = [f"ending{i}" for i in range(4)]
+    context_name = "translation"
+    choice_name = "choices"
 
     if data_args.max_seq_length is None:
         max_seq_length = tokenizer.model_max_length
@@ -321,9 +324,6 @@ def main():
         max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
 
     # Preprocessing the datasets.
-    # preprocess_function = lambda x: unwrapped_preprocess_function(x, tokenizer=tokenizer, context_name="translation", choice_name="choices", max_seq_length=max_seq_length, data_args=data_args)
-    context_name="translation"
-    choice_name="choices"
     def preprocess_function(examples):
         translation = [[context] * 4 for context in examples[context_name]]
         classic_poetry = [
@@ -348,6 +348,7 @@ def main():
         # print(results)
         # Un-flatten
         return results 
+
 
     if training_args.do_train:
         if "train" not in raw_datasets:
