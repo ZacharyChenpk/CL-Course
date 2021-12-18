@@ -16,6 +16,7 @@ import transformers
 from transformers import (
     AutoModelForMultipleChoice,
     AutoModel,
+    AutoTokenizer
 )
 from transformers.file_utils import PaddingStrategy
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
@@ -162,6 +163,14 @@ class DataCollatorForMultipleChoice:
         # ===
         return batch
 
+MyTokenizer = lambda model_args, config: AutoTokenizer.from_pretrained(
+    model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
+    cache_dir=model_args.cache_dir,
+    use_fast=model_args.use_fast_tokenizer,
+    revision=model_args.model_revision,
+    use_auth_token=True if model_args.use_auth_token else None,
+)
+
 # MyModule = lambda model_args, config: AutoModelForMultipleChoice.from_pretrained(
 #             model_args.model_name_or_path,
 #             from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -191,7 +200,10 @@ class MyModule(nn.Module):
 
         self.pos_weights = nn.Parameter(torch.ones(len(CTB_TAGS), 1)/len(CTB_TAGS))
         self.pos_scorer = nn.Parameter(torch.eye(self.model.config.hidden_size))
-        self.pos_info_factor = nn.Parameter(torch.tensor(.5))
+        if model_args.pos_info_factor == None:
+            self.pos_info_factor = nn.Parameter(torch.tensor(.5))
+        else:
+            self.pos_info_factor = float(model_args.pos_info_factor)
         self.loss = nn.CrossEntropyLoss()
 
     def forward(self, input_ids, attention_mask, token_type_ids, labels, postag_ids, postag_onehot):
@@ -223,7 +235,8 @@ class MyModule(nn.Module):
         # print(output.hidden_states[-1].size())
         pos_scores = output.hidden_states[-1][:,0].view(bsz*4, -1).mm(self.pos_scorer).view(bsz, 4, -1).bmm(pos_info).squeeze(2)
         # pos_scores: n_sent * 4
-        logits = (1-self.pos_info_factor) * output.logits + self.pos_info_factor * pos_scores
+        # logits = (1-self.pos_info_factor) * output.logits + self.pos_info_factor * pos_scores
+        logits = output.logits + self.pos_info_factor * pos_scores
         # print(output.logits.size(), pos_scores.size(), logits.size())
         # print(logits, labels, self.loss(logits, labels))
         return {"logits": logits, "loss": self.loss(logits, labels)}

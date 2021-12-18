@@ -46,8 +46,9 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 
-# from model import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice
-from model_with_tag import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice
+# from model import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
+from model_with_tag import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
+# from model_mt5 import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,12 @@ class ModelArguments:
         metadata={
             "help": "Will use the token generated when running `transformers-cli login` (necessary to use this script "
             "with private models)."
+        },
+    )
+    pos_info_factor: Optional[float] = field(
+        default=None,
+        metadata={
+            "help": "The multiplied factor hyperparameter, default to be trainable."
         },
     )
 
@@ -231,13 +238,14 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        use_fast=model_args.use_fast_tokenizer,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-    )
+    tokenizer = MyTokenizer(model_args, config)
+    # tokenizer = AutoTokenizer.from_pretrained(
+    #     model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
+    #     cache_dir=model_args.cache_dir,
+    #     use_fast=model_args.use_fast_tokenizer,
+    #     revision=model_args.model_revision,
+    #     use_auth_token=True if model_args.use_auth_token else None,
+    # )
     model = MyModule(model_args, config)
     # model = AutoModelForMultipleChoice.from_pretrained(
     #     model_args.model_name_or_path,
