@@ -1,7 +1,9 @@
 # CL-Course
 
-## Getting Start
+## Dependencies
 
 ```bash
-@ZacharyChenpk
+pip install -r requirements.txt
 ```
+
+## Getting Start
