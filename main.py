@@ -46,7 +46,8 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 
-from model import unwrapped_preprocess_function, MyModule
+# from model import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice
+from model_with_tag import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice
 
 logger = logging.getLogger(__name__)
 
@@ -146,60 +147,6 @@ class DataTrainingArguments:
         if self.validation_file is not None:
             extension = self.validation_file.split(".")[-1]
             assert extension in ["csv", "jsonl"], "`validation_file` should be a csv or a json file."
-
-@dataclass
-class DataCollatorForMultipleChoice:
-    """
-    Data collator that will dynamically pad the inputs for multiple choice received.
-    Args:
-        tokenizer (:class:`~transformers.PreTrainedTokenizer` or :class:`~transformers.PreTrainedTokenizerFast`):
-            The tokenizer used for encoding the data.
-        padding (:obj:`bool`, :obj:`str` or :class:`~transformers.file_utils.PaddingStrategy`, `optional`, defaults to :obj:`True`):
-            Select a strategy to pad the returned sequences (according to the model's padding side and padding index)
-            among:
-            * :obj:`True` or :obj:`'longest'`: Pad to the longest sequence in the batch (or no padding if only a single
-              sequence if provided).
-            * :obj:`'max_length'`: Pad to a maximum length specified with the argument :obj:`max_length` or to the
-              maximum acceptable input length for the model if that argument is not provided.
-            * :obj:`False` or :obj:`'do_not_pad'` (default): No padding (i.e., can output a batch with sequences of
-              different lengths).
-        max_length (:obj:`int`, `optional`):
-            Maximum length of the returned list and optionally padding length (see above).
-        pad_to_multiple_of (:obj:`int`, `optional`):
-            If set will pad the sequence to a multiple of the provided value.
-            This is especially useful to enable the use of Tensor Cores on NVIDIA hardware with compute capability >=
-            7.5 (Volta).
-    """
-
-    tokenizer: PreTrainedTokenizerBase
-    padding: Union[bool, str, PaddingStrategy] = True
-    max_length: Optional[int] = None
-    pad_to_multiple_of: Optional[int] = None
-
-    def __call__(self, features):
-        label_name = "labels"
-        # print(features[0].keys())
-        labels = [feature.pop(label_name) for feature in features]
-        batch_size = len(features)
-        num_choices = len(features[0]["input_ids"])
-        flattened_features = [
-            [{k: v[i] for k, v in feature.items()} for i in range(num_choices)] for feature in features
-        ]
-        flattened_features = sum(flattened_features, [])
-
-        batch = self.tokenizer.pad(
-            flattened_features,
-            padding=self.padding,
-            max_length=self.max_length,
-            pad_to_multiple_of=self.pad_to_multiple_of,
-            return_tensors="pt",
-        )
-
-        # Un-flatten
-        batch = {k: v.view(batch_size, num_choices, -1) for k, v in batch.items()}
-        # Add back labels
-        batch["labels"] = torch.tensor(labels, dtype=torch.int64)
-        return batch
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -321,33 +268,33 @@ def main():
         max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
 
     # Preprocessing the datasets.
-    # preprocess_function = lambda x: unwrapped_preprocess_function(x, tokenizer=tokenizer, context_name="translation", choice_name="choices", max_seq_length=max_seq_length, data_args=data_args)
-    context_name="translation"
-    choice_name="choices"
-    def preprocess_function(examples):
-        translation = [[context] * 4 for context in examples[context_name]]
-        classic_poetry = [
-            [c for c in choices] for choices in examples[choice_name]
-        ]
+    preprocess_function = lambda x: unwrapped_preprocess_function(x, tokenizer=tokenizer, context_name="translation", choice_name="choices", max_seq_length=max_seq_length, data_args=data_args)
+    # context_name="translation"
+    # choice_name="choices"
+    # def preprocess_function(examples):
+    #     translation = [[context] * 4 for context in examples[context_name]]
+    #     classic_poetry = [
+    #         [c for c in choices] for choices in examples[choice_name]
+    #     ]
 
-        # Flatten out
-        first_sentences = sum(translation, [])
-        second_sentences = sum(classic_poetry, [])
+    #     # Flatten out
+    #     first_sentences = sum(translation, [])
+    #     second_sentences = sum(classic_poetry, [])
 
-        # Tokenize
-        tokenized_examples = tokenizer(
-            first_sentences,
-            second_sentences,
-            truncation=True,
-            max_length=max_seq_length,
-            padding="max_length" if data_args.pad_to_max_length else False,
-        )
-        results = {}
-        results.update({k: [v[i : i + 4] for i in range(0, len(v), 4)] for k, v in tokenized_examples.items()})
-        results['labels'] = [ answer for answer in examples['answer']]
-        # print(results)
-        # Un-flatten
-        return results 
+    #     # Tokenize
+    #     tokenized_examples = tokenizer(
+    #         first_sentences,
+    #         second_sentences,
+    #         truncation=True,
+    #         max_length=max_seq_length,
+    #         padding="max_length" if data_args.pad_to_max_length else False,
+    #     )
+    #     results = {}
+    #     results.update({k: [v[i : i + 4] for i in range(0, len(v), 4)] for k, v in tokenized_examples.items()})
+    #     results['labels'] = [ answer for answer in examples['answer']]
+    #     # print(results)
+    #     # Un-flatten
+    #     return results 
 
     if training_args.do_train:
         if "train" not in raw_datasets:

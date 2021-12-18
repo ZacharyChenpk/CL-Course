@@ -27,6 +27,7 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.utils import check_min_version
 
 def unwrapped_preprocess_function(examples, tokenizer, context_name, choice_name, max_seq_length, data_args):
+    # Examples is a dict with keys: translation, choices, answer, size is 1k?
     translation = [[context] * 4 for context in examples[context_name]]
     classic_poetry = [
         [c for c in choices] for choices in examples[choice_name]
@@ -82,8 +83,9 @@ class DataCollatorForMultipleChoice:
     pad_to_multiple_of: Optional[int] = None
 
     def __call__(self, features):
+        # Keys of each item in features: attention_mask, input_ids, labels, token_type_ids
         label_name = "labels"
-        # print(features[0].keys())
+        # print(list(features[0].keys()))
         labels = [feature.pop(label_name) for feature in features]
         batch_size = len(features)
         num_choices = len(features[0]["input_ids"])

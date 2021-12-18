@@ -217,7 +217,7 @@ class MyModule(nn.Module):
         # print(pos_info.last_hidden_state.size(), postag_onehot.size())
         pos_info = pos_info.last_hidden_state.permute(0, 2, 1).bmm(postag_onehot)
         # pos_info: n_sent * hid_dim * 33
-        pos_info = pos_info / postag_onehot.sum(dim=1, keepdim=True)
+        pos_info = pos_info / (postag_onehot.sum(dim=1, keepdim=True)+1e-10)
         pos_info = pos_info.bmm(self.pos_weights.unsqueeze(0).repeat(pos_info.size(0), 1, 1))
         # pos_info: n_sent * hid_dim * 1
         # print(output.hidden_states[-1].size())
@@ -225,4 +225,5 @@ class MyModule(nn.Module):
         # pos_scores: n_sent * 4
         logits = (1-self.pos_info_factor) * output.logits + self.pos_info_factor * pos_scores
         # print(output.logits.size(), pos_scores.size(), logits.size())
+        # print(logits, labels, self.loss(logits, labels))
         return {"logits": logits, "loss": self.loss(logits, labels)}
