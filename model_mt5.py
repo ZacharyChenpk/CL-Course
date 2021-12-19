@@ -14,13 +14,9 @@ from datasets import load_dataset
 
 import transformers
 from transformers import (
-    AutoConfig,
-    AutoModelForMultipleChoice,
-    AutoTokenizer,
-    HfArgumentParser,
-    TrainingArguments,
-    default_data_collator,
-    set_seed,
+    MT5EncoderModel,
+    BertPreTrainedModel,
+    T5Tokenizer
 )
 from transformers.file_utils import PaddingStrategy
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
@@ -107,13 +103,9 @@ class DataCollatorForMultipleChoice:
         # Add back labels
         batch["labels"] = torch.tensor(labels, dtype=torch.int64)
         return batch
-    
-MyTokenizer = lambda model_args, config: AutoTokenizer.from_pretrained(
-    model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-    cache_dir=model_args.cache_dir,
-    use_fast=model_args.use_fast_tokenizer,
-    revision=model_args.model_revision,
-    use_auth_token=True if model_args.use_auth_token else None,
+
+MyTokenizer = lambda model_args, config: T5Tokenizer.from_pretrained(
+    model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path
 )
 
 # MyModule = lambda model_args, config: AutoModelForMultipleChoice.from_pretrained(
@@ -124,23 +116,96 @@ MyTokenizer = lambda model_args, config: AutoTokenizer.from_pretrained(
 #             revision=model_args.model_revision,
 #             use_auth_token=True if model_args.use_auth_token else None,
 #         )
-class MyModule(nn.Module):
+# class MyModule(nn.Module):
+#     def __init__(self, model_args, config):
+#         super(MyModule, self).__init__()
+#         self.model = AutoModelForMultipleChoice.from_pretrained(
+#             model_args.model_name_or_path,
+#             from_tf=bool(".ckpt" in model_args.model_name_or_path),
+#             config=config,
+#             cache_dir=model_args.cache_dir,
+#             revision=model_args.model_revision,
+#             use_auth_token=True if model_args.use_auth_token else None,
+#         )
+
+#     def forward(self, input_ids = None, attention_mask = None, token_type_ids = None, labels = None):
+#         return self.model(
+#             input_ids = input_ids, 
+#             attention_mask = attention_mask, 
+#             token_type_ids = token_type_ids, 
+#             labels = labels, 
+#         )
+    
+class MyModule(BertPreTrainedModel):
     def __init__(self, model_args, config):
-        super(MyModule, self).__init__()
-        self.model = AutoModelForMultipleChoice.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config,
-            cache_dir=model_args.cache_dir,
-            revision=model_args.model_revision,
-            use_auth_token=True if model_args.use_auth_token else None,
+        super(MyModule, self).__init__(config)
+
+        self.mt5 = MT5EncoderModel.from_pretrained(model_args.model_name_or_path)
+        # classifier_dropout = (
+        #     config.hidden_dropout_prob
+        # )
+        self.dropout = nn.Dropout(0.1)
+        self.classifier = nn.Linear(config.hidden_size, 1)
+        config.initializer_range = 0.02
+
+        # Initialize weights and apply final processing
+        self.post_init()
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=True,
+    ):
+        r"""
+        labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`):
+            Labels for computing the multiple choice classification loss. Indices should be in ``[0, ...,
+            num_choices-1]`` where :obj:`num_choices` is the size of the second dimension of the input tensors. (See
+            :obj:`input_ids` above)
+        """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        num_choices = input_ids.shape[1] if input_ids is not None else inputs_embeds.shape[1]
+
+        input_ids = input_ids.view(-1, input_ids.size(-1)) if input_ids is not None else None
+        attention_mask = attention_mask.view(-1, attention_mask.size(-1)) if attention_mask is not None else None
+        token_type_ids = token_type_ids.view(-1, token_type_ids.size(-1)) if token_type_ids is not None else None
+        position_ids = position_ids.view(-1, position_ids.size(-1)) if position_ids is not None else None
+        inputs_embeds = (
+            inputs_embeds.view(-1, inputs_embeds.size(-2), inputs_embeds.size(-1))
+            if inputs_embeds is not None
+            else None
         )
 
-    def forward(self, input_ids = None, attention_mask = None, token_type_ids = None, labels = None):
-        return self.model(
-            input_ids = input_ids, 
-            attention_mask = attention_mask, 
-            token_type_ids = token_type_ids, 
-            labels = labels, 
+        outputs = self.mt5(
+            input_ids,
+            attention_mask=attention_mask,
+            # token_type_ids=token_type_ids,
+            # position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=True,
         )
-    
+
+        # print(outputs['last_hidden_state'].size())
+        pooled_output = outputs['last_hidden_state'][:,0]
+
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+        reshaped_logits = logits.view(-1, num_choices)
+
+        loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(reshaped_logits, labels)
+
+        return {"loss": loss,
+            "logits": reshaped_logits}
