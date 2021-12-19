@@ -26,13 +26,12 @@ from transformers import (
 from transformers.file_utils import PaddingStrategy
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.utils import check_min_version
-from transformers import AutoTokenizer
-from transformers.utils.dummy_pt_objects import AutoModelForMaskedLM
+from transformers import AutoTokenizer, AutoModelForMaskedLM
 
 
 def unwrapped_preprocess_function(examples, tokenizer, context_name, choice_name, max_seq_length, data_args):
     # Examples is a dict with keys: translation, choices, answer, size is 1k?
-    translation = [[context] * 4 for context in examples[context_name]]
+    translation = [[context] for context in examples[context_name]]
     classic_poetry = [
         [c for c in choices] for choices in examples[choice_name]
     ]
@@ -41,19 +40,24 @@ def unwrapped_preprocess_function(examples, tokenizer, context_name, choice_name
     second_sentences = sum(classic_poetry, [])
 
     # Tokenize
-    tokenized_examples = tokenizer(
+    tokenized_first_examples = tokenizer(
         first_sentences,
+        truncation=True,
+        max_length=max_seq_length,
+        padding="max_length" if data_args.pad_to_max_length else False,
+    )
+    tokenized_second_examples = tokenizer(
         second_sentences,
         truncation=True,
         max_length=max_seq_length,
         padding="max_length" if data_args.pad_to_max_length else False,
     )
     results = {}
-    results.update({k: [v[i: i + 4] for i in range(0, len(v), 4)]
-                   for k, v in tokenized_examples.items()})
+    results.update(
+        {'first_' + k: v for k, v in tokenized_first_examples.items()})
+    results.update({'second_' + k: [v[i: i + 4] for i in range(0, len(v), 4)]
+                   for k, v in tokenized_second_examples.items()})
     results['labels'] = [answer for answer in examples['answer']]
-    # print(results)
-    # Un-flatten
     return results
 
 
@@ -87,30 +91,40 @@ class DataCollatorForMultipleChoice:
     pad_to_multiple_of: Optional[int] = None
 
     def __call__(self, features):
-        # Keys of each item in features: attention_mask, input_ids, labels, token_type_ids
+        # Keys of each item in features: first/second_attention_mask, first/second_input_ids, labels, first/second_token_type_ids
         label_name = "labels"
-        # print(list(features[0].keys()))
         labels = [feature.pop(label_name) for feature in features]
-        batch_size = len(features)
-        num_choices = len(features[0]["input_ids"])
-        flattened_features = [
-            [{k: v[i] for k, v in feature.items()} for i in range(num_choices)] for feature in features
-        ]
-        flattened_features = sum(flattened_features, [])
+        first_features = [{k.split("first_", 1)[1]: v for k, v in feature.items(
+        ) if k.startswith("first")} for feature in features]
+        second_features = [{k.split("second_", 1)[1]: v for k, v in feature.items(
+        ) if k.startswith("second")} for feature in features]
 
+        batch_size = len(features)
+        num_choices = len(features[0]["second_input_ids"])
+        flattened_second_features = [
+            [{k: v[i] for k, v in feature.items()} for i in range(num_choices)] for feature in second_features
+        ]
+        flattened_second_features = sum(flattened_second_features, [])
+        merged_flattened_features = first_features + flattened_second_features
         batch = self.tokenizer.pad(
-            flattened_features,
+            merged_flattened_features,
             padding=self.padding,
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors="pt",
         )
-
-        # Un-flatten
-        batch = {k: v.view(batch_size, num_choices, -1)
-                 for k, v in batch.items()}
+        batch1 = {k: v[:batch_size] for k, v in batch.items()}
+        batch2 = {k: v[batch_size:] for k, v in batch.items()}
+        batch1 = {'first_' + k: v for k, v in batch1.items()}
+        batch2 = {'second_' + k: v.view(batch_size, num_choices, -1)
+                  for k, v in batch2.items()}
+        batch = {}
+        batch.update(batch1)
+        batch.update(batch2)
         # Add back labels
         batch["labels"] = torch.tensor(labels, dtype=torch.int64)
+        batch["targets"] = F.one_hot(
+            batch["labels"], num_classes=num_choices).to(torch.float64)
         return batch
 
 
@@ -133,34 +147,46 @@ class SimModule(nn.Module):
             revision=model_args.model_revision,
             use_auth_token=True if model_args.use_auth_token else None,
         )
-        self.cosine_embedding_loss = nn.CosineEmbeddingLoss()
+        self.loss_func = nn.CrossEntropyLoss()
 
-    def forward(self, first_input_ids, second_input_ids, first_attention_mask,
-                second_attention_mask, target):
+    def forward(self, first_input_ids,
+                first_token_type_ids,
+                first_attention_mask,
+                second_input_ids,
+                second_token_type_ids,
+                second_attention_mask,
+                labels,
+                targets):
         """[summary]
 
         Args:
             first_input_ids ([type]): (batch_size, seq_len)
-            second_input_ids ([type]): (batch_size, choice_num, seq_len)
+            first_token_type_ids ([type]): (batch_size, seq_len)
             first_attention_mask ([type]): (batch_size, seq_len)
+            second_input_ids ([type]): (batch_size, choice_num, seq_len)
+            second_token_type_ids ([type]): (batch_size, choice_num, seq_len)
             second_attention_mask ([type]): (batch_size, choice_num, seq_len)
-            labels ([type]): (batch_size, num_chioce), 1 for TRUE choice, -1 for FALSE choice
+            labels ([type]): (batch_size, )
         """
         batch_size, num_chioce, seq_len = second_input_ids.shape
         first_output = self.first_model(
             input_ids=first_input_ids,
+            token_type_ids=first_token_type_ids,
             attention_mask=first_attention_mask,
             output_hidden_states=True,
         )
         second_output = self.second_model(
-            input_ids=second_input_ids,
-            attention_mask=second_attention_mask,
+            input_ids=second_input_ids.reshape(batch_size * num_chioce, -1),
+            token_type_ids=second_token_type_ids.reshape(
+                batch_size * num_chioce, -1),
+            attention_mask=second_attention_mask.reshape(
+                batch_size * num_chioce, -1),
             output_hidden_states=True,
         )
         # first_hidden_states: (batch_size, seq_len, hidden_size)
-        # second_hidden_states: (batch_size, choice_num, seq_len, hidden_size)
-        first_hidden_states, _ = first_output.hidden_states
-        second_hidden_states, _ = second_output.hidden_states
+        # second_hidden_states: (batch_size * choice_num, seq_len, hidden_size)
+        first_hidden_states = first_output.hidden_states[0]
+        second_hidden_states = second_output.hidden_states[0]
 
         # reshape `first_hidden_states` to (batch_size, choice_num, seq_len, hidden_size)
         _, _, hidden_size = first_hidden_states.shape
@@ -170,14 +196,17 @@ class SimModule(nn.Module):
                                                                       hidden_size)
 
         # reshape `first_hidden_states` and `second_hidden_states` to
-        # (batch_size * choice_num, seq_len * hidden_size)
+        # (batch_size, choice_num, seq_len * hidden_size)
         first_hidden_states = first_hidden_states.reshape(
-            batch_size * num_chioce, -1)
+            batch_size, num_chioce, -1)
         second_hidden_states = second_hidden_states.reshape(
-            batch_size * num_chioce, -1)
+            batch_size, num_chioce, -1)
 
-        # target (batch_size * chioce_num, )
-        target = target.reshape(-1)
-        loss = self.cosine_embedding_loss(
-            input1=first_hidden_states, input2=second_hidden_states, target=target)
-        return loss
+        # cos_sim : (batch_size, chioce_num)
+        cos_sim = F.cosine_similarity(
+            x1=first_hidden_states, x2=second_hidden_states, dim=2)
+        # output: (batch_size, chioce_num)
+        outputs = F.softmax(cos_sim, dim=1)
+        loss = self.loss_func(outputs, targets)
+        # By default, all models return the loss in the first element.
+        return loss, outputs

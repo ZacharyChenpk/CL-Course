@@ -47,8 +47,7 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 
-from model import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice
-# from model_with_tag import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice
+from model_sim import unwrapped_preprocess_function, SimModule, DataCollatorForMultipleChoice
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +160,7 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
+    
     print(os.getpid(), model_args, data_args, training_args)
     # Setup logging
     logging.basicConfig(
@@ -239,15 +238,7 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model = MyModule(model_args, config)
-    # model = AutoModelForMultipleChoice.from_pretrained(
-    #     model_args.model_name_or_path,
-    #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
-    #     config=config,
-    #     cache_dir=model_args.cache_dir,
-    #     revision=model_args.model_revision,
-    #     use_auth_token=True if model_args.use_auth_token else None,
-    # )
+    model = SimModule(model_args, config)
 
     # When using your own dataset or a different dataset from swag, you will probably need to change this.
     ending_names = [f"ending{i}" for i in range(4)]

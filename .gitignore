@@ -1,4 +1,5 @@
 *.log
-results
 __pycache__/
+results/
 results_with_tag/
+results_sim/
