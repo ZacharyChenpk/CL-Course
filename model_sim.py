@@ -16,8 +16,8 @@ import pdb
 import transformers
 from transformers import (
     AutoConfig,
-    AutoModelForMultipleChoice,
     AutoTokenizer,
+    AutoModel,
     HfArgumentParser,
     TrainingArguments,
     default_data_collator,
@@ -26,7 +26,6 @@ from transformers import (
 from transformers.file_utils import PaddingStrategy
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.utils import check_min_version
-from transformers import AutoTokenizer, AutoModelForMaskedLM
 
 
 def unwrapped_preprocess_function(examples, tokenizer, context_name, choice_name, max_seq_length, data_args):
@@ -105,16 +104,20 @@ class DataCollatorForMultipleChoice:
             [{k: v[i] for k, v in feature.items()} for i in range(num_choices)] for feature in second_features
         ]
         flattened_second_features = sum(flattened_second_features, [])
-        merged_flattened_features = first_features + flattened_second_features
-        batch = self.tokenizer.pad(
-            merged_flattened_features,
+        batch1 = self.tokenizer.pad(
+            first_features,
             padding=self.padding,
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors="pt",
         )
-        batch1 = {k: v[:batch_size] for k, v in batch.items()}
-        batch2 = {k: v[batch_size:] for k, v in batch.items()}
+        batch2 = self.tokenizer.pad(
+            flattened_second_features,
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors="pt",
+        )
         batch1 = {'first_' + k: v for k, v in batch1.items()}
         batch2 = {'second_' + k: v.view(batch_size, num_choices, -1)
                   for k, v in batch2.items()}
@@ -123,15 +126,15 @@ class DataCollatorForMultipleChoice:
         batch.update(batch2)
         # Add back labels
         batch["labels"] = torch.tensor(labels, dtype=torch.int64)
-        batch["targets"] = F.one_hot(
-            batch["labels"], num_classes=num_choices).to(torch.float64)
+        # batch["targets"] = F.one_hot(
+        #     batch["labels"], num_classes=num_choices).to(torch.float64) * 2 - 1
         return batch
 
 
 class SimModule(nn.Module):
     def __init__(self, model_args, config):
         super(SimModule, self).__init__()
-        self.first_model = AutoModelForMaskedLM.from_pretrained(
+        self.first_model = AutoModel.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
             config=config,
@@ -139,7 +142,7 @@ class SimModule(nn.Module):
             revision=model_args.model_revision,
             use_auth_token=True if model_args.use_auth_token else None,
         )
-        self.second_model = AutoModelForMaskedLM.from_pretrained(
+        self.second_model = AutoModel.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
             config=config,
@@ -155,25 +158,23 @@ class SimModule(nn.Module):
                 second_input_ids,
                 second_token_type_ids,
                 second_attention_mask,
-                labels,
-                targets):
+                labels):
         """[summary]
 
         Args:
-            first_input_ids ([type]): (batch_size, seq_len)
-            first_token_type_ids ([type]): (batch_size, seq_len)
-            first_attention_mask ([type]): (batch_size, seq_len)
-            second_input_ids ([type]): (batch_size, choice_num, seq_len)
-            second_token_type_ids ([type]): (batch_size, choice_num, seq_len)
-            second_attention_mask ([type]): (batch_size, choice_num, seq_len)
+            first_input_ids ([type]): (batch_size, seq_len1)
+            first_token_type_ids ([type]): (batch_size, seq_len1)
+            first_attention_mask ([type]): (batch_size, seq_len1)
+            second_input_ids ([type]): (batch_size, choice_num, seq_len2)
+            second_token_type_ids ([type]): (batch_size, choice_num, seq_len2)
+            second_attention_mask ([type]): (batch_size, choice_num, seq_len2)
             labels ([type]): (batch_size, )
         """
-        batch_size, num_chioce, seq_len = second_input_ids.shape
+        batch_size, num_chioce, _ = second_input_ids.shape
         first_output = self.first_model(
             input_ids=first_input_ids,
             token_type_ids=first_token_type_ids,
             attention_mask=first_attention_mask,
-            output_hidden_states=True,
         )
         second_output = self.second_model(
             input_ids=second_input_ids.reshape(batch_size * num_chioce, -1),
@@ -181,32 +182,28 @@ class SimModule(nn.Module):
                 batch_size * num_chioce, -1),
             attention_mask=second_attention_mask.reshape(
                 batch_size * num_chioce, -1),
-            output_hidden_states=True,
         )
-        # first_hidden_states: (batch_size, seq_len, hidden_size)
-        # second_hidden_states: (batch_size * choice_num, seq_len, hidden_size)
-        first_hidden_states = first_output.hidden_states[0]
-        second_hidden_states = second_output.hidden_states[0]
+        # first_hidden_states: (batch_size, hidden_size)
+        # second_hidden_states: (batch_size * choice_num, hidden_size)
+        first_pooler_output = first_output.pooler_output
+        second_pooler_output = second_output.pooler_output
 
-        # reshape `first_hidden_states` to (batch_size, choice_num, seq_len, hidden_size)
-        _, _, hidden_size = first_hidden_states.shape
-        first_hidden_states = first_hidden_states.unsqueeze(1).expand(batch_size,
+        # reshape `first_hidden_states` to (batch_size, choice_num, hidden_size)
+        _, hidden_size = first_pooler_output.shape
+        first_pooler_output = first_pooler_output.unsqueeze(1).expand(batch_size,
                                                                       num_chioce,
-                                                                      seq_len,
                                                                       hidden_size)
 
-        # reshape `first_hidden_states` and `second_hidden_states` to
-        # (batch_size, choice_num, seq_len * hidden_size)
-        first_hidden_states = first_hidden_states.reshape(
-            batch_size, num_chioce, -1)
-        second_hidden_states = second_hidden_states.reshape(
+        # reshape `second_hidden_states` to (batch_size, choice_num, hidden_size)
+        second_pooler_output = second_pooler_output.reshape(
             batch_size, num_chioce, -1)
 
         # cos_sim : (batch_size, chioce_num)
         cos_sim = F.cosine_similarity(
-            x1=first_hidden_states, x2=second_hidden_states, dim=2)
+            x1=first_pooler_output, x2=second_pooler_output, dim=2)
+        cos_sim = (cos_sim + 1) / 2
+        loss = self.loss_func(cos_sim, labels)
         # output: (batch_size, chioce_num)
         outputs = F.softmax(cos_sim, dim=1)
-        loss = self.loss_func(outputs, targets)
         # By default, all models return the loss in the first element.
         return loss, outputs
