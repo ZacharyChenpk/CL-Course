@@ -126,8 +126,6 @@ class DataCollatorForMultipleChoice:
         batch.update(batch2)
         # Add back labels
         batch["labels"] = torch.tensor(labels, dtype=torch.int64)
-        # batch["targets"] = F.one_hot(
-        #     batch["labels"], num_classes=num_choices).to(torch.float64) * 2 - 1
         return batch
 
 
@@ -150,7 +148,7 @@ class SimModule(nn.Module):
             revision=model_args.model_revision,
             use_auth_token=True if model_args.use_auth_token else None,
         )
-        self.loss_func = nn.CrossEntropyLoss()
+        self.corss_entropy_loss = nn.CrossEntropyLoss()
 
     def forward(self, first_input_ids,
                 first_token_type_ids,
@@ -185,24 +183,29 @@ class SimModule(nn.Module):
         )
         # first_hidden_states: (batch_size, hidden_size)
         # second_hidden_states: (batch_size * choice_num, hidden_size)
-        first_pooler_output = first_output.pooler_output
-        second_pooler_output = second_output.pooler_output
+
+        # Use `pooler_output` as embedding
+        # first_embed_output = first_output.pooler_output
+        # second_embed_output = second_output.pooler_output
+        # , Or use CLS hidden state as embedding
+        first_embed_output = first_output.last_hidden_state[:, 0, :]
+        second_embed_output = second_output.last_hidden_state[:, 0, :]
 
         # reshape `first_hidden_states` to (batch_size, choice_num, hidden_size)
-        _, hidden_size = first_pooler_output.shape
-        first_pooler_output = first_pooler_output.unsqueeze(1).expand(batch_size,
-                                                                      num_chioce,
-                                                                      hidden_size)
+        _, hidden_size = first_embed_output.shape
+        first_pooler_output = first_embed_output.unsqueeze(1).expand(batch_size,
+                                                                     num_chioce,
+                                                                     hidden_size)
 
         # reshape `second_hidden_states` to (batch_size, choice_num, hidden_size)
-        second_pooler_output = second_pooler_output.reshape(
+        second_pooler_output = second_embed_output.reshape(
             batch_size, num_chioce, -1)
 
         # cos_sim : (batch_size, chioce_num)
         cos_sim = F.cosine_similarity(
             x1=first_pooler_output, x2=second_pooler_output, dim=2)
-        cos_sim = (cos_sim + 1) / 2
-        loss = self.loss_func(cos_sim, labels)
+        cos_sim /= 0.1  # temperature coefficient = 0.1
+        loss = self.corss_entropy_loss(cos_sim, labels)
         # output: (batch_size, chioce_num)
         outputs = F.softmax(cos_sim, dim=1)
         # By default, all models return the loss in the first element.
