@@ -373,9 +373,53 @@
 #     done
 # done
 
-# TUNE 18
-for lr in 5e-6 1e-5 2e-5 5e-5; do
-    for mtply in 5 10; do
+# TUNE 18 # 5-th trail bomb
+# for lr in 5e-6 1e-5 2e-5 5e-5; do
+#     for mtply in 5 10; do
+#         for bsz in 16; do
+# CUDA_VISIBLE_DEVICES=1 python -u main.py \
+#           --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
+#           --do_train --train_file CCPM-data/train.jsonl \
+#           --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#           --test_file CCPM-data/split_test.jsonl \
+#           --learning_rate ${lr}  --fp16 \
+#           --num_train_epochs 7 \
+#           --multiplier ${mtply} \
+#           --evaluation_strategy epoch \
+#           --output_dir results/extlarge_postag_extra-freeze-randinit_lr${lr}_mtply${mtply}_nte7_bsz${bsz} \
+#           --per_gpu_eval_batch_size=16 \
+#           --per_device_train_batch_size=${bsz} \
+#           --overwrite_output \
+#         #   > ext-large.log 2>&1 &
+#         done
+#     done
+# done
+
+# TUNE 19
+# for lr in 5e-6 1e-5 2e-5; do
+#     for tmpr in 3 5 10; do
+#         for bsz in 16; do
+# CUDA_VISIBLE_DEVICES=1 python -u main.py \
+#           --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
+#           --do_train --train_file CCPM-data/train.jsonl \
+#           --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#           --test_file CCPM-data/split_test.jsonl \
+#           --learning_rate ${lr}  --fp16 \
+#           --num_train_epochs 7 \
+#           --softmax_temperature ${tmpr} \
+#           --evaluation_strategy epoch \
+#           --output_dir results/extlarge_postag_extra-freeze-randinit_lr${lr}_tmpr${tmpr}_nte7_bsz${bsz} \
+#           --per_gpu_eval_batch_size=16 \
+#           --per_device_train_batch_size=${bsz} \
+#           --overwrite_output \
+#         #   > ext-large.log 2>&1 &
+#         done
+#     done
+# done
+
+# TUNE 20
+for lr in 5e-6 1e-5 2e-5; do
+    for tmpr in 3 5 10; do
         for bsz in 16; do
 CUDA_VISIBLE_DEVICES=1 python -u main.py \
           --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
@@ -384,9 +428,9 @@ CUDA_VISIBLE_DEVICES=1 python -u main.py \
           --test_file CCPM-data/split_test.jsonl \
           --learning_rate ${lr}  --fp16 \
           --num_train_epochs 7 \
-          --multiplier ${mtply} \
+          --softmax_temperature ${tmpr} \
           --evaluation_strategy epoch \
-          --output_dir results/extlarge_postag_extra-freeze-randinit_lr${lr}_mtply${mtply}_nte7_bsz${bsz} \
+          --output_dir results/extlarge_postag_extra-freeze-randinit_lr${lr}_tmpr${tmpr}_nte7_bsz${bsz} \
           --per_gpu_eval_batch_size=16 \
           --per_device_train_batch_size=${bsz} \
           --overwrite_output \

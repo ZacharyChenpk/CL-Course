@@ -46,11 +46,7 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 
-# from model import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer, MyOptimizer
-from model_with_tag import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer, MyOptimizer
-# from model_mt5 import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
-# from model_tagscore_only import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
-# from model_with_tagscoring import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
+from model_allcat import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer, MyOptimizer
 
 logger = logging.getLogger(__name__)
 

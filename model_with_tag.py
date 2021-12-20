@@ -209,6 +209,7 @@ class MyModule(nn.Module):
             self.pos_info_factor = nn.Parameter(torch.rand(1))
         else:
             self.pos_info_factor = float(model_args.pos_info_factor)
+        self.args = model_args
         self.loss = nn.CrossEntropyLoss()
 
     def forward(self, input_ids, attention_mask, token_type_ids, labels, postag_ids, postag_onehot):
@@ -244,6 +245,8 @@ class MyModule(nn.Module):
         logits = output.logits + self.pos_info_factor * pos_scores
         # print(output.logits.size(), pos_scores.size(), logits.size())
         # print(logits, labels, self.loss(logits, labels))
+        if self.args.softmax_temperature is not None:
+            logits = output.logits / self.args.softmax_temperature
         return {"logits": logits, "loss": self.loss(logits, labels)}
     
 def MyOptimizer(model, args, multiplier=10):
