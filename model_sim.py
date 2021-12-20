@@ -204,7 +204,7 @@ class SimModule(nn.Module):
         # cos_sim : (batch_size, chioce_num)
         cos_sim = F.cosine_similarity(
             x1=first_pooler_output, x2=second_pooler_output, dim=2)
-        cos_sim /= 0.1  # temperature coefficient = 0.1
+        cos_sim /= 0.07  # temperature coefficient = 0.1
         loss = self.corss_entropy_loss(cos_sim, labels)
         # output: (batch_size, chioce_num)
         outputs = F.softmax(cos_sim, dim=1)
