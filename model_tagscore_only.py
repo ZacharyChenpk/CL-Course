@@ -18,9 +18,6 @@ from transformers import (
     AutoModel,
     AutoTokenizer
 )
-from transformers.trainer_pt_utils import (
-    get_parameter_names
-)
 from transformers.file_utils import PaddingStrategy
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
@@ -199,16 +196,9 @@ class MyModule(nn.Module):
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
             config=config
         )
-        self.pos_info_extractor.requires_grad_(False)
 
         self.pos_weights = nn.Parameter(torch.ones(len(CTB_TAGS), 1)/len(CTB_TAGS))
         self.pos_scorer = nn.Parameter(torch.eye(self.model.config.hidden_size))
-        torch.nn.init.normal_(self.pos_weights)
-        torch.nn.init.normal_(self.pos_scorer)
-        if model_args.pos_info_factor == None:
-            self.pos_info_factor = nn.Parameter(torch.rand(1))
-        else:
-            self.pos_info_factor = float(model_args.pos_info_factor)
         self.loss = nn.CrossEntropyLoss()
 
     def forward(self, input_ids, attention_mask, token_type_ids, labels, postag_ids, postag_onehot):
@@ -237,44 +227,7 @@ class MyModule(nn.Module):
         pos_info = pos_info / (postag_onehot.sum(dim=1, keepdim=True)+1e-10)
         pos_info = pos_info.bmm(self.pos_weights.unsqueeze(0).repeat(pos_info.size(0), 1, 1))
         # pos_info: n_sent * hid_dim * 1
-        # print(output.hidden_states[-1].size())
         pos_scores = output.hidden_states[-1][:,0].view(bsz*4, -1).mm(self.pos_scorer).view(bsz, 4, -1).bmm(pos_info).squeeze(2)
         # pos_scores: n_sent * 4
-        # logits = (1-self.pos_info_factor) * output.logits + self.pos_info_factor * pos_scores
-        logits = output.logits + self.pos_info_factor * pos_scores
-        # print(output.logits.size(), pos_scores.size(), logits.size())
-        # print(logits, labels, self.loss(logits, labels))
+        logits = pos_scores
         return {"logits": logits, "loss": self.loss(logits, labels)}
-    
-def MyOptimizer(model, args, multiplier=10):
-    decay_parameters = get_parameter_names(model, [nn.LayerNorm])
-    decay_parameters = [name for name in decay_parameters if "bias" not in name]
-    pos_parameters = [name for name, _ in model.named_parameters() if "pos_" in name]
-    optimizer_grouped_parameters = [
-        {
-            "params": [p for n, p in model.named_parameters() if n in decay_parameters and n not in pos_parameters and p.requires_grad],
-            "weight_decay": args.weight_decay,
-            "lr": args.learning_rate
-        },
-        {
-            "params": [p for n, p in model.named_parameters() if n not in decay_parameters and n not in pos_parameters and p.requires_grad],
-            "weight_decay": 0.0,
-            "lr": args.learning_rate
-        },
-        {
-            "params": [p for n, p in model.named_parameters() if n in decay_parameters and n in pos_parameters and p.requires_grad],
-            "weight_decay": args.weight_decay,
-            "lr": args.learning_rate * multiplier
-        },
-        {
-            "params": [p for n, p in model.named_parameters() if n not in decay_parameters and n in pos_parameters and p.requires_grad],
-            "weight_decay": 0.0,
-            "lr": args.learning_rate * multiplier
-        },
-    ]
-    optimizer_cls = torch.optim.AdamW
-    optimizer_kwargs = {
-        "betas": (args.adam_beta1, args.adam_beta2),
-        "eps": args.adam_epsilon,
-    }
-    return optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)

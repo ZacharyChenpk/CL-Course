@@ -22,6 +22,9 @@ from transformers import (
     default_data_collator,
     set_seed,
 )
+from transformers.trainer_pt_utils import (
+    get_parameter_names
+)
 from transformers.file_utils import PaddingStrategy
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.utils import check_min_version
@@ -144,3 +147,35 @@ class MyModule(nn.Module):
             labels = labels, 
         )
     
+def MyOptimizer(model, args, multiplier=10):
+    decay_parameters = get_parameter_names(model, [nn.LayerNorm])
+    decay_parameters = [name for name in decay_parameters if "bias" not in name]
+    classifier_parameters = [name for name, _ in model.named_parameters() if "classifier" in name]
+    optimizer_grouped_parameters = [
+        {
+            "params": [p for n, p in model.named_parameters() if n in decay_parameters and n not in classifier_parameters],
+            "weight_decay": args.weight_decay,
+            "lr": args.learning_rate
+        },
+        {
+            "params": [p for n, p in model.named_parameters() if n not in decay_parameters and n not in classifier_parameters],
+            "weight_decay": 0.0,
+            "lr": args.learning_rate
+        },
+        {
+            "params": [p for n, p in model.named_parameters() if n in decay_parameters and n in classifier_parameters],
+            "weight_decay": args.weight_decay,
+            "lr": args.learning_rate * multiplier
+        },
+        {
+            "params": [p for n, p in model.named_parameters() if n not in decay_parameters and n in classifier_parameters],
+            "weight_decay": 0.0,
+            "lr": args.learning_rate * multiplier
+        },
+    ]
+    optimizer_cls = torch.optim.AdamW
+    optimizer_kwargs = {
+        "betas": (args.adam_beta1, args.adam_beta2),
+        "eps": args.adam_epsilon,
+    }
+    return optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
