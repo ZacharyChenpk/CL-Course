@@ -46,9 +46,11 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 
-# from model import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
-from model_with_tag import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
+# from model import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer, MyOptimizer
+from model_with_tag import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer, MyOptimizer
 # from model_mt5 import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
+# from model_tagscore_only import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
+# from model_with_tagscoring import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +146,12 @@ class DataTrainingArguments:
         metadata={
             "help": "For debugging purposes or quicker training, truncate the number of evaluation examples to this "
             "value if set."
+        },
+    )
+    multiplier: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "The learning rate multiplier of non-LM parameters."
         },
     )
 
@@ -354,6 +362,9 @@ def main():
         return {"accuracy": (preds == label_ids).astype(np.float32).mean().item()}
 
     # Initialize our Trainer
+    trainer_optimizer = (None, None)
+    if data_args.multiplier is not None:
+        trainer_optimizer = (MyOptimizer(model, training_args, multiplier=data_args.multiplier), None)
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -362,6 +373,7 @@ def main():
         tokenizer=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics,
+        optimizers=trainer_optimizer
     )
 
     # Training
