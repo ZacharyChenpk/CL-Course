@@ -46,11 +46,7 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 
-# from model import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer, MyOptimizer
-from model_with_tag import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer, MyOptimizer
-# from model_mt5 import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
-# from model_tagscore_only import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
-# from model_with_tagscoring import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer
+
 
 logger = logging.getLogger(__name__)
 
@@ -87,12 +83,6 @@ class ModelArguments:
         metadata={
             "help": "Will use the token generated when running `transformers-cli login` (necessary to use this script "
             "with private models)."
-        },
-    )
-    pos_info_factor: Optional[float] = field(
-        default=None,
-        metadata={
-            "help": "The multiplied factor hyperparameter, default to be trainable."
         },
     )
 
@@ -148,12 +138,6 @@ class DataTrainingArguments:
             "value if set."
         },
     )
-    multiplier: Optional[int] = field(
-        default=None,
-        metadata={
-            "help": "The learning rate multiplier of non-LM parameters."
-        },
-    )
 
     def __post_init__(self):
         if self.train_file is not None:
@@ -162,6 +146,62 @@ class DataTrainingArguments:
         if self.validation_file is not None:
             extension = self.validation_file.split(".")[-1]
             assert extension in ["csv", "jsonl"], "`validation_file` should be a csv or a json file."
+
+
+@dataclass
+class DataCollatorForMultipleChoice:
+    """
+    Data collator that will dynamically pad the inputs for multiple choice received.
+    Args:
+        tokenizer (:class:`~transformers.PreTrainedTokenizer` or :class:`~transformers.PreTrainedTokenizerFast`):
+            The tokenizer used for encoding the data.
+        padding (:obj:`bool`, :obj:`str` or :class:`~transformers.file_utils.PaddingStrategy`, `optional`, defaults to :obj:`True`):
+            Select a strategy to pad the returned sequences (according to the model's padding side and padding index)
+            among:
+            * :obj:`True` or :obj:`'longest'`: Pad to the longest sequence in the batch (or no padding if only a single
+              sequence if provided).
+            * :obj:`'max_length'`: Pad to a maximum length specified with the argument :obj:`max_length` or to the
+              maximum acceptable input length for the model if that argument is not provided.
+            * :obj:`False` or :obj:`'do_not_pad'` (default): No padding (i.e., can output a batch with sequences of
+              different lengths).
+        max_length (:obj:`int`, `optional`):
+            Maximum length of the returned list and optionally padding length (see above).
+        pad_to_multiple_of (:obj:`int`, `optional`):
+            If set will pad the sequence to a multiple of the provided value.
+            This is especially useful to enable the use of Tensor Cores on NVIDIA hardware with compute capability >=
+            7.5 (Volta).
+    """
+
+    tokenizer: PreTrainedTokenizerBase
+    padding: Union[bool, str, PaddingStrategy] = True
+    max_length: Optional[int] = None
+    pad_to_multiple_of: Optional[int] = None
+
+    def __call__(self, features):
+        label_name = "labels"
+        # print(features[0].keys())
+        labels = [feature.pop(label_name) for feature in features]
+        batch_size = len(features)
+        num_choices = len(features[0]["input_ids"])
+        flattened_features = [
+            [{k: v[i] for k, v in feature.items()} for i in range(num_choices)] for feature in features
+        ]
+        flattened_features = sum(flattened_features, [])
+
+        batch = self.tokenizer.pad(
+            flattened_features,
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors="pt",
+        )
+
+        # Un-flatten
+        batch = {k: v.view(batch_size, num_choices, -1) for k, v in batch.items()}
+        # Add back labels
+        batch["labels"] = torch.tensor(labels, dtype=torch.int64)
+        return batch
+
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -246,26 +286,26 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    tokenizer = MyTokenizer(model_args, config)
-    # tokenizer = AutoTokenizer.from_pretrained(
-    #     model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-    #     cache_dir=model_args.cache_dir,
-    #     use_fast=model_args.use_fast_tokenizer,
-    #     revision=model_args.model_revision,
-    #     use_auth_token=True if model_args.use_auth_token else None,
-    # )
-    model = MyModule(model_args, config)
-    # model = AutoModelForMultipleChoice.from_pretrained(
-    #     model_args.model_name_or_path,
-    #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
-    #     config=config,
-    #     cache_dir=model_args.cache_dir,
-    #     revision=model_args.model_revision,
-    #     use_auth_token=True if model_args.use_auth_token else None,
-    # )
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
+        cache_dir=model_args.cache_dir,
+        use_fast=model_args.use_fast_tokenizer,
+        revision=model_args.model_revision,
+        use_auth_token=True if model_args.use_auth_token else None,
+    )
+    model = AutoModelForMultipleChoice.from_pretrained(
+        model_args.model_name_or_path,
+        from_tf=bool(".ckpt" in model_args.model_name_or_path),
+        config=config,
+        cache_dir=model_args.cache_dir,
+        revision=model_args.model_revision,
+        use_auth_token=True if model_args.use_auth_token else None,
+    )
 
     # When using your own dataset or a different dataset from swag, you will probably need to change this.
     ending_names = [f"ending{i}" for i in range(4)]
+    context_name = "translation"
+    choice_name = "choices"
 
     if data_args.max_seq_length is None:
         max_seq_length = tokenizer.model_max_length
@@ -284,33 +324,31 @@ def main():
         max_seq_length = min(data_args.max_seq_length, tokenizer.model_max_length)
 
     # Preprocessing the datasets.
-    preprocess_function = lambda x: unwrapped_preprocess_function(x, tokenizer=tokenizer, context_name="translation", choice_name="choices", max_seq_length=max_seq_length, data_args=data_args)
-    # context_name="translation"
-    # choice_name="choices"
-    # def preprocess_function(examples):
-    #     translation = [[context] * 4 for context in examples[context_name]]
-    #     classic_poetry = [
-    #         [c for c in choices] for choices in examples[choice_name]
-    #     ]
+    def preprocess_function(examples):
+        translation = [[context] * 4 for context in examples[context_name]]
+        classic_poetry = [
+            [c for c in choices] for choices in examples[choice_name]
+        ]
 
-    #     # Flatten out
-    #     first_sentences = sum(translation, [])
-    #     second_sentences = sum(classic_poetry, [])
+        # Flatten out
+        first_sentences = sum(translation, [])
+        second_sentences = sum(classic_poetry, [])
 
-    #     # Tokenize
-    #     tokenized_examples = tokenizer(
-    #         first_sentences,
-    #         second_sentences,
-    #         truncation=True,
-    #         max_length=max_seq_length,
-    #         padding="max_length" if data_args.pad_to_max_length else False,
-    #     )
-    #     results = {}
-    #     results.update({k: [v[i : i + 4] for i in range(0, len(v), 4)] for k, v in tokenized_examples.items()})
-    #     results['labels'] = [ answer for answer in examples['answer']]
-    #     # print(results)
-    #     # Un-flatten
-    #     return results 
+        # Tokenize
+        tokenized_examples = tokenizer(
+            first_sentences,
+            second_sentences,
+            truncation=True,
+            max_length=max_seq_length,
+            padding="max_length" if data_args.pad_to_max_length else False,
+        )
+        results = {}
+        results.update({k: [v[i : i + 4] for i in range(0, len(v), 4)] for k, v in tokenized_examples.items()})
+        results['labels'] = [ answer for answer in examples['answer']]
+        # print(results)
+        # Un-flatten
+        return results 
+
 
     if training_args.do_train:
         if "train" not in raw_datasets:
@@ -362,9 +400,6 @@ def main():
         return {"accuracy": (preds == label_ids).astype(np.float32).mean().item()}
 
     # Initialize our Trainer
-    trainer_optimizer = (None, None)
-    if data_args.multiplier is not None:
-        trainer_optimizer = (MyOptimizer(model, training_args, multiplier=data_args.multiplier), None)
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -373,7 +408,6 @@ def main():
         tokenizer=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics,
-        optimizers=trainer_optimizer
     )
 
     # Training
