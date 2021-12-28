@@ -22,15 +22,15 @@
 #           --per_device_train_batch_size=16 \
 #           --overwrite_output
 
-CUDA_VISIBLE_DEVICES=1 python -u main.py \
+CUDA_VISIBLE_DEVICES=2 python -u main.py \
           --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
-          --do_train --train_file CCPM-data/train.jsonl \
-          --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+          --do_train --train_file CCPM-data/split_test.jsonl \
+          --do_eval  --validation_file CCPM-data/split_test.jsonl \
           --test_file CCPM-data/split_test.jsonl \
           --learning_rate 1e-5  --fp16 \
-          --num_train_epochs 10 \
+          --num_train_epochs 5 \
           --evaluation_strategy epoch \
-          --output_dir results/with_tagscoring \
+          --output_dir results/extlarge-dualtagcat \
           --per_gpu_eval_batch_size=16 \
           --per_device_train_batch_size=16 \
           --overwrite_output

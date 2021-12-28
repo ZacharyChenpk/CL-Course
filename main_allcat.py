@@ -365,7 +365,7 @@ def main():
 
     # Initialize our Trainer
     trainer_optimizer = (None, None)
-    if data_args.multiplier is not None:
+    if data_args.multiplier is not None and data_args.multiplier != 1.:
         trainer_optimizer = (MyOptimizer(model, training_args, multiplier=data_args.multiplier), None)
     trainer = Trainer(
         model=model,

@@ -17,7 +17,7 @@ from transformers import (
     AutoModel,
     BertPreTrainedModel,
     AutoTokenizer,
-    HfArgumentParser,
+    AutoModelForSequenceClassification,
     TrainingArguments,
     default_data_collator,
     set_seed,
@@ -35,11 +35,11 @@ def unwrapped_preprocess_function(examples, tokenizer, context_name, choice_name
     classic_poetry = [
         "[SEP]".join(choices) for choices in examples[choice_name]
     ]
+    sentences = [t+'[SEP]'+c for t,c in zip(translation, classic_poetry)]
 
     # Tokenize
     tokenized_examples = tokenizer(
-        translation,
-        classic_poetry,
+        sentences,
         truncation=True,
         max_length=max_seq_length,
         padding="max_length" if data_args.pad_to_max_length else False,
@@ -117,77 +117,107 @@ MyTokenizer = lambda model_args, config: AutoTokenizer.from_pretrained(
 #             revision=model_args.model_revision,
 #             use_auth_token=True if model_args.use_auth_token else None,
 #         )
-class MyModule(BertPreTrainedModel):
+# class MyModule(BertPreTrainedModel):
+#     def __init__(self, model_args, config):
+#         super(MyModule, self).__init__(config)
+#         self.model = AutoModel.from_pretrained(
+#             model_args.model_name_or_path,
+#             from_tf=bool(".ckpt" in model_args.model_name_or_path),
+#             config=config,
+#             cache_dir=model_args.cache_dir,
+#             revision=model_args.model_revision,
+#             use_auth_token=True if model_args.use_auth_token else None,
+#         )
+#         self.args = model_args
+#         self.loss = nn.CrossEntropyLoss()
+#         self.dropout = nn.Dropout(0.1)
+#         self.classifier = nn.Linear(config.hidden_size, 4)
+
+#         # Initialize weights and apply final processing
+#         config.initializer_range = 0.02
+#         self.post_init()
+
+#     def forward(
+#         self,
+#         input_ids=None,
+#         attention_mask=None,
+#         token_type_ids=None,
+#         position_ids=None,
+#         head_mask=None,
+#         inputs_embeds=None,
+#         labels=None,
+#         output_attentions=None,
+#         output_hidden_states=None,
+#         return_dict=None,
+#     ):
+#         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+#         num_choices = 4
+#         # ipdb.set_trace()
+
+#         input_ids = input_ids.view(-1, input_ids.size(-1)) if input_ids is not None else None
+#         attention_mask = attention_mask.view(-1, attention_mask.size(-1)) if attention_mask is not None else None
+#         token_type_ids = token_type_ids.view(-1, token_type_ids.size(-1)) if token_type_ids is not None else None
+#         position_ids = position_ids.view(-1, position_ids.size(-1)) if position_ids is not None else None
+#         inputs_embeds = (
+#             inputs_embeds.view(-1, inputs_embeds.size(-2), inputs_embeds.size(-1))
+#             if inputs_embeds is not None
+#             else None
+#         )
+
+#         outputs = self.model(
+#             input_ids,
+#             attention_mask=attention_mask,
+#             token_type_ids=token_type_ids,
+#             position_ids=position_ids,
+#             head_mask=head_mask,
+#             inputs_embeds=inputs_embeds,
+#             output_attentions=output_attentions,
+#             output_hidden_states=output_hidden_states,
+#             return_dict=return_dict,
+#         )
+
+#         # pooled_output = outputs[1]
+#         pooled_output = outputs.last_hidden_state[:,0]
+
+#         pooled_output = self.dropout(pooled_output)
+#         reshaped_logits = self.classifier(pooled_output)
+#         # reshaped_logits = logits.view(-1, num_choices)
+
+#         loss = None
+#         if self.args.softmax_temperature is not None:
+#             reshaped_logits = reshaped_logits / self.args.softmax_temperature
+#         if labels is not None:
+#             loss = self.loss(reshaped_logits, labels)
+#         return {"loss": loss,
+#             "logits": reshaped_logits}
+
+class MyModule(nn.Module):
     def __init__(self, model_args, config):
-        super(MyModule, self).__init__(config)
-        self.model = AutoModel.from_pretrained(
+        super(MyModule, self).__init__()
+        config.num_labels = 4
+        self.model = AutoModelForSequenceClassification.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config,
-            cache_dir=model_args.cache_dir,
-            revision=model_args.model_revision,
-            use_auth_token=True if model_args.use_auth_token else None,
+            config=config
         )
         self.args = model_args
-        self.loss = nn.CrossEntropyLoss()
-        self.dropout = nn.Dropout(0.1)
-        self.classifier = nn.Linear(config.hidden_size, 4)
-
-        # Initialize weights and apply final processing
-        config.initializer_range = 0.02
-        self.post_init()
-
-    def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        labels=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-    ):
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        num_choices = 4
-
-        input_ids = input_ids.view(-1, input_ids.size(-1)) if input_ids is not None else None
-        attention_mask = attention_mask.view(-1, attention_mask.size(-1)) if attention_mask is not None else None
-        token_type_ids = token_type_ids.view(-1, token_type_ids.size(-1)) if token_type_ids is not None else None
-        position_ids = position_ids.view(-1, position_ids.size(-1)) if position_ids is not None else None
-        inputs_embeds = (
-            inputs_embeds.view(-1, inputs_embeds.size(-2), inputs_embeds.size(-1))
-            if inputs_embeds is not None
-            else None
-        )
-
-        outputs = self.model(
-            input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
-
-        pooled_output = outputs[1]
-
-        pooled_output = self.dropout(pooled_output)
-        logits = self.classifier(pooled_output)
-        reshaped_logits = logits.view(-1, num_choices)
-
-        loss = None
-        if labels is not None:
-            loss = self.loss(reshaped_logits, labels)
         if self.args.softmax_temperature is not None:
-            reshaped_logits = reshaped_logits / self.args.softmax_temperature
-        return {"loss": loss,
-            "logits": reshaped_logits}
+            self.loss = nn.CrossEntropyLoss()
+
+    def forward(self, input_ids = None, attention_mask = None, token_type_ids = None, labels = None):
+        # print(type(self.model))
+        if 'guwenbert' in self.args.model_name_or_path:
+            token_type_ids[:] = 0
+        output = self.model(
+            input_ids = input_ids, 
+            attention_mask = attention_mask, 
+            token_type_ids = token_type_ids, 
+            labels = labels, 
+        )
+        if self.args.softmax_temperature is None or self.args.softmax_temperature == 1.:
+            return output
+        logits = output.logits / self.args.softmax_temperature
+        return {"logits": logits, "loss": self.loss(logits, labels)}
     
 def MyOptimizer(model, args, multiplier=10):
     decay_parameters = get_parameter_names(model, [nn.LayerNorm])

@@ -89,7 +89,7 @@
 
 # TUNE 5
 # for nte in 2 3 4; do
-#     CUDA_VISIBLE_DEVICES=2 python -u main.py \
+#     CUDA_VISIBLE_DEVICES=0 python -u main.py \
 #             --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
 #             --do_train --train_file CCPM-data/train.jsonl \
 #             --do_eval  --validation_file CCPM-data/split_valid.jsonl \
@@ -104,7 +104,7 @@
 
 # for nte in 2 3 4; do
 #     for factor in 0.1 0.5 1 5 10; do
-#     CUDA_VISIBLE_DEVICES=2 python -u main.py \
+#     CUDA_VISIBLE_DEVICES=0 python -u main.py \
 #             --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
 #             --do_train --train_file CCPM-data/train.jsonl \
 #             --do_eval  --validation_file CCPM-data/split_valid.jsonl \
@@ -115,39 +115,6 @@
 #             --output_dir results/extlarge_postag_extra-freeze_lr5e-5_nte${nte}_bsz16_factor${factor} \
 #             --per_gpu_eval_batch_size=16 \
 #             --per_device_train_batch_size=16 \
-#             --overwrite_output \
-#             #   > ext-large.log 2>&1 &
-#     done
-# done
-
-# TUNE 6
-# for nte in 2 3 4; do
-#     CUDA_VISIBLE_DEVICES=0 python -u main.py \
-#             --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
-#             --do_train --train_file CCPM-data/train.jsonl \
-#             --do_eval  --validation_file CCPM-data/split_valid.jsonl \
-#             --test_file CCPM-data/split_test.jsonl \
-#             --learning_rate 2e-5  --fp16 \
-#             --num_train_epochs ${nte} \
-#             --output_dir results/extlarge_postag_extra-freeze_lr2e-5_nte${nte}_bsz8_factorNone \
-#             --per_gpu_eval_batch_size=16 \
-#             --per_device_train_batch_size=8 \
-#             --overwrite_output
-# done
-
-# for nte in 2 3 4; do
-#     for factor in 0.1 0.5 1 5 10; do
-#     CUDA_VISIBLE_DEVICES=0 python -u main.py \
-#             --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
-#             --do_train --train_file CCPM-data/train.jsonl \
-#             --do_eval  --validation_file CCPM-data/split_valid.jsonl \
-#             --test_file CCPM-data/split_test.jsonl \
-#             --learning_rate 2e-5  --fp16 \
-#             --num_train_epochs ${nte} \
-#             --pos_info_factor ${factor} \
-#             --output_dir results/extlarge_postag_extra-freeze_lr2e-5_nte${nte}_bsz8_factor${factor} \
-#             --per_gpu_eval_batch_size=16 \
-#             --per_device_train_batch_size=8 \
 #             --overwrite_output \
 #             #   > ext-large.log 2>&1 &
 #     done
@@ -332,7 +299,7 @@
 #     done
 # done
 
-# TUNE 16
+# # TUNE 16
 # for lr in 1e-5 2e-5 5e-5; do
 #     for bsz in 8 16; do
 # CUDA_VISIBLE_DEVICES=3 python -u main.py \
@@ -341,7 +308,7 @@
 #         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
 #         --test_file CCPM-data/split_test.jsonl \
 #         --learning_rate ${lr}  --fp16 \
-#         --num_train_epochs 7 \
+#         --num_train_epochs 6 \
 #         --evaluation_strategy epoch \
 #         --output_dir results/guwenbert-large_lr${lr}_nte7_bsz${bsz} \
 #         --per_gpu_eval_batch_size=16 \
@@ -373,7 +340,7 @@
 #     done
 # done
 
-# TUNE 18 # 5-th trail bomb
+# TUNE 18
 # for lr in 5e-6 1e-5 2e-5 5e-5; do
 #     for mtply in 5 10; do
 #         for bsz in 16; do
@@ -397,7 +364,7 @@
 
 # TUNE 19
 # for lr in 5e-6 1e-5 2e-5; do
-#     for tmpr in 3 5 10; do
+#     for tmpr in 5 10; do
 #         for bsz in 16; do
 # CUDA_VISIBLE_DEVICES=1 python -u main.py \
 #           --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
@@ -418,23 +385,230 @@
 # done
 
 # TUNE 20
-for lr in 5e-6 1e-5 2e-5; do
-    for tmpr in 3 5 10; do
-        for bsz in 16; do
-CUDA_VISIBLE_DEVICES=1 python -u main.py \
-          --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
-          --do_train --train_file CCPM-data/train.jsonl \
-          --do_eval  --validation_file CCPM-data/split_valid.jsonl \
-          --test_file CCPM-data/split_test.jsonl \
-          --learning_rate ${lr}  --fp16 \
-          --num_train_epochs 7 \
-          --softmax_temperature ${tmpr} \
-          --evaluation_strategy epoch \
-          --output_dir results/extlarge_postag_extra-freeze-randinit_lr${lr}_tmpr${tmpr}_nte7_bsz${bsz} \
-          --per_gpu_eval_batch_size=16 \
-          --per_device_train_batch_size=${bsz} \
-          --overwrite_output \
-        #   > ext-large.log 2>&1 &
+# for lr in 5e-6 1e-5 2e-5; do
+#     for tmpr in 3 5 10; do
+#         for bsz in 16; do
+# CUDA_VISIBLE_DEVICES=1 python -u main.py \
+#           --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
+#           --do_train --train_file CCPM-data/train.jsonl \
+#           --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#           --test_file CCPM-data/split_test.jsonl \
+#           --learning_rate ${lr}  --fp16 \
+#           --num_train_epochs 7 \
+#           --softmax_temperature ${tmpr} \
+#           --evaluation_strategy epoch \
+#           --output_dir results/extlarge_postag_extra-freeze-randinit_lr${lr}_tmpr${tmpr}_nte7_bsz${bsz} \
+#           --per_gpu_eval_batch_size=16 \
+#           --per_device_train_batch_size=${bsz} \
+#           --overwrite_output \
+#         #   > ext-large.log 2>&1 &
+#         done
+#     done
+# done
+
+# TUNE 21
+# models=("hfl/chinese-macbert-large" "voidful/albert_chinese_large" "voidful/albert_chinese_base")
+# for modelname in ${models[@]}; do
+#     for lr in 5e-6 1e-5 2e-5; do
+#         for tmpr in 3 5 10; do
+# CUDA_VISIBLE_DEVICES=0 python -u main.py \
+#         --model_name_or_path  ${modelname} \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 4 \
+#         --softmax_temperature ${tmpr} \
+#         --evaluation_strategy epoch \
+#         --output_dir results/${modelname}_lr${lr}_tmpr${tmpr}_nte4_bsz16 \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=16 \
+#         --overwrite_output \
+#         #   > ext-large.log 2>&1 &
+#         done
+#     done
+# done
+
+# TUNE baseline
+# for lr in 1e-5 2e-5 5e-5; do
+# CUDA_VISIBLE_DEVICES=0 python -u main.py \
+#         --model_name_or_path  hfl/chinese-roberta-wwm-ext \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 3 \
+#         --output_dir results/ext_lr${lr}_nte3_bsz16 \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=16 \
+#         --overwrite_output \
+#     #   > ext-large.log 2>&1 &
+# done
+
+# TUNE 22
+# for lr in 1e-5; do
+#     for bsz in 8; do
+# CUDA_VISIBLE_DEVICES=3 python -u main.py \
+#         --model_name_or_path  ethanyt/guwenbert-large \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 12 \
+#         --evaluation_strategy epoch \
+#         --output_dir results/guwenbert-large_lr${lr}_nte12_bsz${bsz} \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=${bsz} \
+#         --overwrite_output \
+#     #   > ext-large.log 2>&1 &
+#     done
+# done
+
+# TUNE 23
+# for lr in 5e-6 1e-5; do
+# CUDA_VISIBLE_DEVICES=2 python -u main.py \
+#         --model_name_or_path  ethanyt/guwenbert-large \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 5 \
+#         --evaluation_strategy epoch \
+#         --output_dir results/gwbtlarge_postag_extra-freeze-randinit-_lr${lr}_nte5_bsz16 \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=16 \
+#         --overwrite_output \
+#     #   > ext-large.log 2>&1 &
+# done
+
+# TUNE 24
+# for lr in 5e-6 1e-5 2e-5; do
+#     for tmpr in 5 10; do
+# CUDA_VISIBLE_DEVICES=3 python -u main_dual_tmp.py \
+#         --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 5 \
+#         --softmax_temperature ${tmpr} \
+#         --evaluation_strategy epoch \
+#         --output_dir results/extlarge_dualtag-_lr${lr}_tmpr${tmpr}_nte5_bsz16 \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=16 \
+#         --overwrite_output \
+#     #   > ext-large.log 2>&1 &
+#     done
+# done
+
+# TUNE 25
+# for lr in 5e-6 1e-5 2e-5; do
+# CUDA_VISIBLE_DEVICES=3 python -u main.py \
+#         --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 5 \
+#         --evaluation_strategy epoch \
+#         --output_dir results/extlarge_dualtagcat_lr${lr}_nte5_bsz16 \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=16 \
+#         --overwrite_output \
+#     #   > ext-large.log 2>&1 &
+# done
+
+# TUNE 26
+# for lr in 5e-6 1e-5 2e-5; do
+#     for factor in 0.1 1 10 -1; do
+# CUDA_VISIBLE_DEVICES=3 python -u main.py \
+#         --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 5 \
+#         --pos_info_factor ${factor} \
+#         --evaluation_strategy epoch \
+#         --output_dir results/extlarge_dualtagcat_lr${lr}_nte5_bsz16_factor${factor} \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=16 \
+#         --overwrite_output \
+#     #   > ext-large.log 2>&1 &
+#     done
+# done
+
+# TUNE 27
+# for tmpr in 1 5 10; do
+#     for mtply in 1 5 10; do
+#         for lr in 5e-6 1e-5; do
+#             for bsz in 8; do
+# CUDA_VISIBLE_DEVICES=2 python -u main_allcat.py \
+#         --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 10 \
+#         --softmax_temperature ${tmpr} \
+#         --multiplier ${mtply} \
+#         --evaluation_strategy epoch \
+#         --output_dir results/allcat_extlarge_lr${lr}_tmpr${tmpr}_mtply${mtply}_nte10_bsz${bsz} \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=${bsz} \
+#         --save_steps 5448 \
+#         --overwrite_output
+#             done
+#         done
+#     done
+# done
+
+# TUNE 28
+# for tmpr in 1 5 10; do
+#     for mtply in 1 5 10; do
+#         for lr in 5e-6 1e-5; do
+#             for bsz in 16; do
+# CUDA_VISIBLE_DEVICES=1 python -u main_allcat.py \
+#         --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 10 \
+#         --softmax_temperature ${tmpr} \
+#         --multiplier ${mtply} \
+#         --evaluation_strategy epoch \
+#         --output_dir results/allcat_extlarge_lr${lr}_tmpr${tmpr}_mtply${mtply}_nte10_bsz${bsz} \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=${bsz} \
+#         --save_steps 2724 \
+#         --overwrite_output
+#             done
+#         done
+#     done
+# done
+
+# TUNE 29
+for tmpr in 1 5 10; do
+    for mtply in 1 5 10; do
+        for lr in 5e-6 1e-5; do
+            for bsz in 8; do
+CUDA_VISIBLE_DEVICES=3 python -u main_allcat.py \
+        --model_name_or_path  ethanyt/guwenbert-large \
+        --do_train --train_file CCPM-data/train.jsonl \
+        --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+        --test_file CCPM-data/split_test.jsonl \
+        --learning_rate ${lr}  --fp16 \
+        --num_train_epochs 10 \
+        --softmax_temperature ${tmpr} \
+        --multiplier ${mtply} \
+        --evaluation_strategy epoch \
+        --output_dir results/allcat_gwblarge_lr${lr}_tmpr${tmpr}_mtply${mtply}_nte10_bsz${bsz} \
+        --per_gpu_eval_batch_size=16 \
+        --per_device_train_batch_size=${bsz} \
+        --save_strategy no \
+        --overwrite_output
+            done
         done
     done
 done

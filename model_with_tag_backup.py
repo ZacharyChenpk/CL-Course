@@ -56,7 +56,12 @@ def unwrapped_preprocess_function(examples, tokenizer, context_name, choice_name
     hanout = HanLP(examples[context_name])
     seg_sents = hanout['tok/fine']
     postags = hanout['pos/ctb']
-
+    # pool = Pool()
+    # # slices = [pool.apply_async(wordlist_to_slices, words) for words in seg_sents]
+    # # postag_lens = [pool.apply_async(len, words) for words in seg_sents]
+    # postag_ids = [pool.apply_async(tags_and_words_to_ids, tags_and_words) for tags_and_words in zip(postags, seg_sents)]
+    # pool.close()
+    # pool.join()
     postag_ids = map(tags_and_words_to_ids, zip(postags, seg_sents))
     postag_ids, postag_onehot = zip(*postag_ids)
     translation = [[context] * 4 for context in examples[context_name]]
@@ -76,16 +81,8 @@ def unwrapped_preprocess_function(examples, tokenizer, context_name, choice_name
         max_length=max_seq_length,
         padding="max_length" if data_args.pad_to_max_length else False,
     )
-    translate_tokenized_examples = tokenizer(
-        first_sentences,
-        truncation=True,
-        max_length=max_seq_length,
-        padding="max_length" if data_args.pad_to_max_length else False,
-    )
-    
     results = {}
     results.update({k: [v[i : i + 4] for i in range(0, len(v), 4)] for k, v in tokenized_examples.items()})
-    results.update({'trans_'+k: [v[i : i + 4] for i in range(0, len(v), 4)] for k, v in translate_tokenized_examples.items()})
     results['labels'] = [ answer for answer in examples['answer']]
     # postag_ids: n_sent * n_char
     # postag_ids: n_sent * n_char * 33
@@ -134,18 +131,16 @@ class DataCollatorForMultipleChoice:
         # postag_ids: n_sent * n_char * 33
         postag_ids = [torch.tensor(feature.pop("postag_ids")) for feature in features]
         postag_onehot = [torch.tensor(feature.pop("postag_onehot")) for feature in features]
+        # print(len(postag_onehot))
+        # print(postag_onehot)
         postag_ids = pad_sequence(postag_ids).T
         postag_onehot = pad_sequence(postag_onehot).permute(1,0,2)
         batch_size = len(features)
         num_choices = len(features[0]["input_ids"])
         flattened_features = [
-            [{k: v[i] for k, v in feature.items() if k[:6] != 'trans_'} for i in range(num_choices)] for feature in features
+            [{k: v[i] for k, v in feature.items()} for i in range(num_choices)] for feature in features
         ]
         flattened_features = sum(flattened_features, [])
-        trans_flattened_features = [
-            [{k[6:]: v[i] for k, v in feature.items() if k[:6] == 'trans_'} for i in range(num_choices)] for feature in features
-        ]
-        trans_flattened_features = sum(trans_flattened_features, [])
 
         batch = self.tokenizer.pad(
             flattened_features,
@@ -154,17 +149,9 @@ class DataCollatorForMultipleChoice:
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors="pt",
         )
-        trans_batch = self.tokenizer.pad(
-            trans_flattened_features,
-            padding=self.padding,
-            max_length=self.max_length,
-            pad_to_multiple_of=self.pad_to_multiple_of,
-            return_tensors="pt",
-        )
 
         # Un-flatten
         batch = {k: v.view(batch_size, num_choices, -1) for k, v in batch.items()}
-        batch.update({'trans_'+k: v.view(batch_size, num_choices, -1) for k, v in trans_batch.items()})
         # Add back labels
         batch["labels"] = torch.tensor(labels, dtype=torch.int64)
         # batch["slices"] = slices
@@ -225,14 +212,11 @@ class MyModule(nn.Module):
         self.args = model_args
         self.loss = nn.CrossEntropyLoss()
 
-    def forward(self, input_ids, attention_mask, token_type_ids, trans_input_ids, trans_attention_mask, trans_token_type_ids, labels, postag_ids, postag_onehot):
+    def forward(self, input_ids, attention_mask, token_type_ids, labels, postag_ids, postag_onehot):
         # input_ids: n_sent * 4 * n_both_char
         # postag_ids: n_sent * n_char
         # postag_onehot: n_sent * n_char * 33
         # print(input_ids.size())
-        if 'guwenbert' in self.args.model_name_or_path:
-            token_type_ids[:] = 0
-            trans_token_type_ids[:] = 0
         output = self.model(
             input_ids = input_ids, 
             attention_mask = attention_mask, 
@@ -241,22 +225,26 @@ class MyModule(nn.Module):
             output_hidden_states = True
         )
         bsz = postag_onehot.size(0)
+        context_len = postag_onehot.size(1)
         pos_info = self.pos_info_extractor(
-            input_ids = trans_input_ids[:, 0], 
-            attention_mask = trans_attention_mask[:, 0], 
-            token_type_ids = trans_token_type_ids[:, 0],
+            input_ids = input_ids[:, 0, :context_len], 
+            attention_mask = attention_mask[:, 0, :context_len], 
+            token_type_ids = token_type_ids[:, 0, :context_len],
             output_hidden_states = True
         )
-        
-        real_context_len = postag_onehot.size(1)
-        pos_info = pos_info.last_hidden_state.permute(0, 2, 1)[:,:,:real_context_len].bmm(postag_onehot)
+        # print(pos_info.last_hidden_state.size(), postag_onehot.size())
+        pos_info = pos_info.last_hidden_state.permute(0, 2, 1).bmm(postag_onehot)
         # pos_info: n_sent * hid_dim * 33
         pos_info = pos_info / (postag_onehot.sum(dim=1, keepdim=True)+1e-10)
         pos_info = pos_info.bmm(self.pos_weights.unsqueeze(0).repeat(pos_info.size(0), 1, 1))
         # pos_info: n_sent * hid_dim * 1
+        # print(output.hidden_states[-1].size())
         pos_scores = output.hidden_states[-1][:,0].view(bsz*4, -1).mm(self.pos_scorer).view(bsz, 4, -1).bmm(pos_info).squeeze(2)
         # pos_scores: n_sent * 4
+        # logits = (1-self.pos_info_factor) * output.logits + self.pos_info_factor * pos_scores
         logits = output.logits + self.pos_info_factor * pos_scores
+        # print(output.logits.size(), pos_scores.size(), logits.size())
+        # print(logits, labels, self.loss(logits, labels))
         if self.args.softmax_temperature is not None:
             logits = output.logits / self.args.softmax_temperature
         return {"logits": logits, "loss": self.loss(logits, labels)}
