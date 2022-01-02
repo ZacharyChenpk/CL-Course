@@ -24,21 +24,21 @@ chmod +x run_model.sh
 ## Files Structure
 
 zip
-├── CCPM-data ### Original and split data
-│   ├── split_test.jsonl
-│   ├── split_valid.jsonl
-│   ├── test_public.jsonl
-│   ├── train.jsonl
-│   └── valid.jsonl
-├── data_split.py ### code for splitting valid.jsonl
-├── main.py ### entry of all models except PLM-Match
-├── main_sim.py ### entry of PLM-Match model
-├── model_allcat.py ### PLM-All
-├── model_allcat_tag.py ### PLM-All-Tag
-├── model_dual_tag_cat.py ### PLM-DualTag
-├── model.py ### PLM-CLS
-├── model_sim.py ### PLM-Match
-├── model_with_tag.py ### PLM-Tag
-├── README.md
-├── requirements.txt
-├── run_model.sh
+├── CCPM-data ### Original and split data  
+│   ├── split_test.jsonl  
+│   ├── split_valid.jsonl  
+│   ├── test_public.jsonl  
+│   ├── train.jsonl  
+│   └── valid.jsonl  
+├── data_split.py ### code for splitting valid.jsonl  
+├── main.py ### entry of all models except PLM-Match  
+├── main_sim.py ### entry of PLM-Match model  
+├── model_allcat.py ### PLM-All  
+├── model_allcat_tag.py ### PLM-All-Tag  
+├── model_dual_tag_cat.py ### PLM-DualTag  
+├── model.py ### PLM-CLS  
+├── model_sim.py ### PLM-Match  
+├── model_with_tag.py ### PLM-Tag  
+├── README.md  
+├── requirements.txt  
+├── run_model.sh  
