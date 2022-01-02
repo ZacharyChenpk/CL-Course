@@ -22,7 +22,8 @@ chmod +x run_model.sh
 ```
 
 ## Files Structure
-.
+
+zip
 ├── CCPM-data ### Original and split data
 │   ├── split_test.jsonl
 │   ├── split_valid.jsonl
