@@ -46,7 +46,8 @@ from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 
-from model_allcat import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer, MyOptimizer
+# from model_allcat import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer, MyOptimizer
+from model_allcat_tag import unwrapped_preprocess_function, MyModule, DataCollatorForMultipleChoice, MyTokenizer, MyOptimizer
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,12 @@ class DataTrainingArguments:
             "help": "The learning rate multiplier of non-LM parameters."
         },
     )
+    tagging_ratio: Optional[float] = field(
+        default=0.5,
+        metadata={
+            "help": "How much ratio of taggings repeated in translation."
+        },
+    )
 
     def __post_init__(self):
         if self.train_file is not None:
@@ -249,22 +256,7 @@ def main():
         use_auth_token=True if model_args.use_auth_token else None,
     )
     tokenizer = MyTokenizer(model_args, config)
-    # tokenizer = AutoTokenizer.from_pretrained(
-    #     model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-    #     cache_dir=model_args.cache_dir,
-    #     use_fast=model_args.use_fast_tokenizer,
-    #     revision=model_args.model_revision,
-    #     use_auth_token=True if model_args.use_auth_token else None,
-    # )
     model = MyModule(model_args, config)
-    # model = AutoModelForMultipleChoice.from_pretrained(
-    #     model_args.model_name_or_path,
-    #     from_tf=bool(".ckpt" in model_args.model_name_or_path),
-    #     config=config,
-    #     cache_dir=model_args.cache_dir,
-    #     revision=model_args.model_revision,
-    #     use_auth_token=True if model_args.use_auth_token else None,
-    # )
 
     # When using your own dataset or a different dataset from swag, you will probably need to change this.
     ending_names = [f"ending{i}" for i in range(4)]
@@ -287,32 +279,6 @@ def main():
 
     # Preprocessing the datasets.
     preprocess_function = lambda x: unwrapped_preprocess_function(x, tokenizer=tokenizer, context_name="translation", choice_name="choices", max_seq_length=max_seq_length, data_args=data_args)
-    # context_name="translation"
-    # choice_name="choices"
-    # def preprocess_function(examples):
-    #     translation = [[context] * 4 for context in examples[context_name]]
-    #     classic_poetry = [
-    #         [c for c in choices] for choices in examples[choice_name]
-    #     ]
-
-    #     # Flatten out
-    #     first_sentences = sum(translation, [])
-    #     second_sentences = sum(classic_poetry, [])
-
-    #     # Tokenize
-    #     tokenized_examples = tokenizer(
-    #         first_sentences,
-    #         second_sentences,
-    #         truncation=True,
-    #         max_length=max_seq_length,
-    #         padding="max_length" if data_args.pad_to_max_length else False,
-    #     )
-    #     results = {}
-    #     results.update({k: [v[i : i + 4] for i in range(0, len(v), 4)] for k, v in tokenized_examples.items()})
-    #     results['labels'] = [ answer for answer in examples['answer']]
-    #     # print(results)
-    #     # Un-flatten
-    #     return results 
 
     if training_args.do_train:
         if "train" not in raw_datasets:

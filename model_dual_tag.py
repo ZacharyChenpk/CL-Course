@@ -223,15 +223,6 @@ MyTokenizer = lambda model_args, config: AutoTokenizer.from_pretrained(
     use_auth_token=True if model_args.use_auth_token else None,
 )
 
-# MyModule = lambda model_args, config: AutoModelForMultipleChoice.from_pretrained(
-#             model_args.model_name_or_path,
-#             from_tf=bool(".ckpt" in model_args.model_name_or_path),
-#             config=config,
-#             cache_dir=model_args.cache_dir,
-#             revision=model_args.model_revision,
-#             use_auth_token=True if model_args.use_auth_token else None,
-#         )
-
 class MyModule(nn.Module):
     def __init__(self, model_args, config):
         super(MyModule, self).__init__()
@@ -266,7 +257,6 @@ class MyModule(nn.Module):
         # postag_onehot: n_sent * n_char * 33
         # ans_postag_ids: (n_sent*4) * n_char
         # ans_postag_onehot: (n_sent*4) * n_char * 33
-        # print(input_ids.size())
         if 'guwenbert' in self.args.model_name_or_path:
             token_type_ids[:] = 0
             trans_token_type_ids[:] = 0

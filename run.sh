@@ -589,11 +589,114 @@
 # done
 
 # TUNE 29
+# for tmpr in 1 5 10; do
+#     for mtply in 1 5 10; do
+#         for lr in 5e-6 1e-5; do
+#             for bsz in 8; do
+# CUDA_VISIBLE_DEVICES=3 python -u main_allcat.py \
+#         --model_name_or_path  ethanyt/guwenbert-large \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 10 \
+#         --softmax_temperature ${tmpr} \
+#         --multiplier ${mtply} \
+#         --evaluation_strategy epoch \
+#         --output_dir results/allcat_gwblarge_lr${lr}_tmpr${tmpr}_mtply${mtply}_nte10_bsz${bsz} \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=${bsz} \
+#         --save_strategy no \
+#         --overwrite_output
+#             done
+#         done
+#     done
+# 
+
+# TUNE 30
+# for tmpr in 1 5 10; do
+#     for mtply in 1 5 10; do
+#         for lr in 5e-6; do
+#             for tr in 0.2 0.5 0.8; do
+# CUDA_VISIBLE_DEVICES=1 python -u main_allcat.py \
+#         --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 10 \
+#         --softmax_temperature ${tmpr} \
+#         --multiplier ${mtply} \
+#         --tagging_ratio ${tr} \
+#         --evaluation_strategy epoch \
+#         --output_dir results/allcattag_extlarge_lr${lr}_tmpr${tmpr}_mtply${mtply}_tr${tr}_nte10_bsz16 \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=16 \
+#         --save_steps 2724 \
+#         --overwrite_output
+#             done
+#         done
+#     done
+# done
+
+# TUNE 31
+# for tmpr in 1 5 10; do
+#     for mtply in 1 5 10; do
+#         for lr in 1e-5; do
+#             for tr in 0.2 0.5 0.8; do
+# CUDA_VISIBLE_DEVICES=3 python -u main_allcat.py \
+#         --model_name_or_path  hfl/chinese-roberta-wwm-ext-large \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 10 \
+#         --softmax_temperature ${tmpr} \
+#         --multiplier ${mtply} \
+#         --tagging_ratio ${tr} \
+#         --evaluation_strategy epoch \
+#         --output_dir results/allcattag_extlarge_lr${lr}_tmpr${tmpr}_mtply${mtply}_tr${tr}_nte10_bsz16 \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=16 \
+#         --save_steps 2724 \
+#         --overwrite_output
+#             done
+#         done
+#     done
+# done
+
+# TUNE 32
+# for tmpr in 1 5 10; do
+#     for mtply in 1 5 10; do
+#         for lr in 1e-5; do
+#             for tr in 0.2 0.5 0.8; do
+# CUDA_VISIBLE_DEVICES=3 python -u main_allcat.py \
+#         --model_name_or_path  ethanyt/guwenbert-large \
+#         --do_train --train_file CCPM-data/train.jsonl \
+#         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
+#         --test_file CCPM-data/split_test.jsonl \
+#         --learning_rate ${lr}  --fp16 \
+#         --num_train_epochs 10 \
+#         --softmax_temperature ${tmpr} \
+#         --multiplier ${mtply} \
+#         --tagging_ratio ${tr} \
+#         --evaluation_strategy epoch \
+#         --output_dir results/allcattag_gwblarge_lr${lr}_tmpr${tmpr}_mtply${mtply}_tr${tr}_nte10_bsz16 \
+#         --per_gpu_eval_batch_size=16 \
+#         --per_device_train_batch_size=16 \
+#         --save_steps 2724 \
+#         --overwrite_output
+#             done
+#         done
+#     done
+# done
+
+# TUNE 33
 for tmpr in 1 5 10; do
     for mtply in 1 5 10; do
-        for lr in 5e-6 1e-5; do
-            for bsz in 8; do
-CUDA_VISIBLE_DEVICES=3 python -u main_allcat.py \
+        for lr in 5e-6; do
+            for tr in 0.2 0.5 0.8; do
+CUDA_VISIBLE_DEVICES=2 python -u main_allcat.py \
         --model_name_or_path  ethanyt/guwenbert-large \
         --do_train --train_file CCPM-data/train.jsonl \
         --do_eval  --validation_file CCPM-data/split_valid.jsonl \
@@ -602,11 +705,12 @@ CUDA_VISIBLE_DEVICES=3 python -u main_allcat.py \
         --num_train_epochs 10 \
         --softmax_temperature ${tmpr} \
         --multiplier ${mtply} \
+        --tagging_ratio ${tr} \
         --evaluation_strategy epoch \
-        --output_dir results/allcat_gwblarge_lr${lr}_tmpr${tmpr}_mtply${mtply}_nte10_bsz${bsz} \
+        --output_dir results/allcattag_gwblarge_lr${lr}_tmpr${tmpr}_mtply${mtply}_tr${tr}_nte10_bsz16 \
         --per_gpu_eval_batch_size=16 \
-        --per_device_train_batch_size=${bsz} \
-        --save_strategy no \
+        --per_device_train_batch_size=16 \
+        --save_steps 2724 \
         --overwrite_output
             done
         done

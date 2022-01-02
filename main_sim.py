@@ -261,32 +261,6 @@ def main():
 
     # Preprocessing the datasets.
     preprocess_function = lambda x: unwrapped_preprocess_function(x, tokenizer=tokenizer, context_name="translation", choice_name="choices", max_seq_length=max_seq_length, data_args=data_args)
-    # context_name="translation"
-    # choice_name="choices"
-    # def preprocess_function(examples):
-    #     translation = [[context] * 4 for context in examples[context_name]]
-    #     classic_poetry = [
-    #         [c for c in choices] for choices in examples[choice_name]
-    #     ]
-
-    #     # Flatten out
-    #     first_sentences = sum(translation, [])
-    #     second_sentences = sum(classic_poetry, [])
-
-    #     # Tokenize
-    #     tokenized_examples = tokenizer(
-    #         first_sentences,
-    #         second_sentences,
-    #         truncation=True,
-    #         max_length=max_seq_length,
-    #         padding="max_length" if data_args.pad_to_max_length else False,
-    #     )
-    #     results = {}
-    #     results.update({k: [v[i : i + 4] for i in range(0, len(v), 4)] for k, v in tokenized_examples.items()})
-    #     results['labels'] = [ answer for answer in examples['answer']]
-    #     # print(results)
-    #     # Un-flatten
-    #     return results 
 
     if training_args.do_train:
         if "train" not in raw_datasets:

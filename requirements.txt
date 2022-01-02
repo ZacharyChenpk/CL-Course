@@ -1,6 +1,7 @@
 hanlp==2.1.0a65
 jsonlines==3.0.0
-numpy==1.21.4
-scikit_learn==1.0.1
-torch==1.10.1
-transformers==4.14.1
+numpy==1.20.2
+scikit_learn==0.24.1
+torch==1.9.0
+transformers==4.13.0
+datasets==1.16.1

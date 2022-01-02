@@ -176,13 +176,6 @@ class DataCollatorForMultipleChoice:
         batch["postag_onehot"] = postag_onehot
         batch["ans_postag_ids"] = postag_ids
         batch["ans_postag_onehot"] = postag_onehot
-        # print(postag_onehot.size())
-        # postag_masks = torch.zeros(batch.size(0), batch.size(2), len(CTB_TAGS))
-        # ===
-        # for sent_id in range(batch_size):
-        #     for word_id in range(len(postag_ids[sent_id])):
-        #         postag_masks[sent_id][slices[sent_id][word_id]][:,postag_ids[sent_id][word_id]] = 1.
-        # ===
         return batch
 
 MyTokenizer = lambda model_args, config: AutoTokenizer.from_pretrained(
@@ -192,15 +185,6 @@ MyTokenizer = lambda model_args, config: AutoTokenizer.from_pretrained(
     revision=model_args.model_revision,
     use_auth_token=True if model_args.use_auth_token else None,
 )
-
-# MyModule = lambda model_args, config: AutoModelForMultipleChoice.from_pretrained(
-#             model_args.model_name_or_path,
-#             from_tf=bool(".ckpt" in model_args.model_name_or_path),
-#             config=config,
-#             cache_dir=model_args.cache_dir,
-#             revision=model_args.model_revision,
-#             use_auth_token=True if model_args.use_auth_token else None,
-#         )
 
 class MyModule(nn.Module):
     def __init__(self, model_args, config):

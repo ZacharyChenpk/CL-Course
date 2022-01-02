@@ -5,37 +5,71 @@ from dataclasses import dataclass, field
 from typing import Optional, Union
 from random import shuffle
 
-import datasets
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from datasets import load_dataset
 
 import transformers
 from transformers import (
-    AutoModel,
-    BertPreTrainedModel,
     AutoTokenizer,
     AutoModelForSequenceClassification,
-    TrainingArguments,
-    default_data_collator,
-    set_seed,
 )
 from transformers.trainer_pt_utils import (
     get_parameter_names
 )
 from transformers.file_utils import PaddingStrategy
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
-from transformers.utils import check_min_version
+import hanlp
+from collections import Counter
+
+CTB_TAGS = ['VA', 'DEC', 'NN', 'VV', 'AS', 'AD', 'SB', 'PU', 'PN', 'DEG', 'NT', 'M', 'P', 'LC', 'JJ', 'CC', 'VE', 'BA', 'CS', 'DER', 'NR', 'DT', 'SP', 'MSP', 'VC', 'CD', 'NOI', 'DEV', 'ON', 'OD', 'ETC', 'IJ', 'LB']
+CTB_TAG_DICT = {k:i for i,k in enumerate(CTB_TAGS)}
+
+HanLP = hanlp.load(hanlp.pretrained.mtl.CLOSE_TOK_POS_NER_SRL_DEP_SDP_CON_ELECTRA_SMALL_ZH)
+
+def char_level_tag(tags_and_words):
+    tags, words = tags_and_words
+    return sum([[tags[i]] * len(words[i]) for i in range(len(tags))], [])
+
+def ratio_split(counter, ratio):
+    tags, counter_nums = list(zip(*counter.items()))
+    bound = sum(counter_nums) * (1-ratio)
+    pivot = 0
+    while bound > 0 and pivot < len(counter):
+        bound -= counter_nums[pivot]
+        pivot += 1
+    return tags[pivot-1:]
+
+def char_level_filtering(inputs):
+    sentence, postags, filter = inputs
+    # print(inputs)
+    sentence = ''.join(sentence)
+    return ''.join([c for i, c in enumerate(sentence) if postags[i] in filter])
 
 def unwrapped_preprocess_function(examples, tokenizer, context_name, choice_name, max_seq_length, data_args):
     # Examples is a dict with keys: translation, choices, answer, size is 1k?
     translation = [context for context in examples[context_name]]
     classic_poetry = [
-        "[SEP]".join(choices) for choices in examples[choice_name]
+        choices for choices in examples[choice_name]
     ]
-    sentences = [t+'[SEP]'+c for t,c in zip(translation, classic_poetry)]
+
+    hanout = HanLP(examples[context_name])
+    seg_sents = hanout['tok/fine']
+    postags = hanout['pos/ctb']
+    postags = map(char_level_tag, zip(postags, seg_sents))
+
+    ans_hanout = HanLP(sum(examples[choice_name], []))
+    ans_seg_sents = ans_hanout['tok/fine']
+    ans_postags = ans_hanout['pos/ctb']
+    ans_postags = map(char_level_tag, zip(ans_postags, ans_seg_sents))
+    ans_postags_counters = list(map(Counter, ans_postags))
+    ans_postags_counters = [ans_postags_counters[i]+ans_postags_counters[i+1]+ans_postags_counters[i+2]+ans_postags_counters[i+3] for i in range(0, len(ans_postags_counters), 4)]
+
+    filter_tags = map(lambda x: ratio_split(x, data_args.tagging_ratio), ans_postags_counters)
+    filtered_sen = map(char_level_filtering, zip(seg_sents, postags, filter_tags))
+    sentences = [t+'[SEP]'+f+'[SEP]'+"[SEP]".join(c) for t,f,c in zip(translation, filtered_sen, classic_poetry)]
+    print(sentences[0])
 
     # Tokenize
     tokenized_examples = tokenizer(
@@ -46,7 +80,8 @@ def unwrapped_preprocess_function(examples, tokenizer, context_name, choice_name
     )
     results = {}
     results.update(tokenized_examples)
-    results['labels'] = [ answer for answer in examples['answer']]
+    if 'answer' in examples:
+        results['labels'] = [ answer for answer in examples['answer']]
     # print(results)
     # Un-flatten
     return results 
