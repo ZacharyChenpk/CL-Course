@@ -15,7 +15,8 @@ from model_allcat_tag import unwrapped_preprocess_function, MyModule, DataCollat
 
 2. Modifying the parameters and available CUDA device in run_model.sh (Optional)
 
-3. ```bash
+3. 
+```bash
 chmod +x run_model.sh
 ./run_model.sh
 ```
