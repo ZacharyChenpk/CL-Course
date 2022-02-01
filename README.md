@@ -35,10 +35,8 @@ zip
 ├── main_sim.py ### entry of PLM-Match model  
 ├── model_allcat.py ### PLM-All  
 ├── model_allcat_tag.py ### PLM-All-Tag  
-├── model_dual_tag_cat.py ### PLM-DualTag  
 ├── model.py ### PLM-CLS  
 ├── model_sim.py ### PLM-Match  
-├── model_with_tag.py ### PLM-Tag  
 ├── README.md  
 ├── requirements.txt  
 ├── run_model.sh  

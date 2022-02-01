@@ -4,3 +4,11 @@ __pycache__/
 results/
 results_with_tag/
 results_sim/
+*.ipynb
+tree.txt
+results_mt5/
+README_old.md
+run.sh
+run_[afos]*.sh
+model_[wtmd]*.py
+main_[oa]*.py
