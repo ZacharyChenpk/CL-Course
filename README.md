@@ -1,5 +1,7 @@
 # CL-Course
 
+This project is based on the backbone repository: https://github.com/TobiasLee/CCPM-baseline.
+
 ## Dependencies
 
 ```bash
